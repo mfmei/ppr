@@ -1,0 +1,214 @@
+"""
+Core filtering + tiered multi-child matching logic.
+
+Tiers for a multi-child search, in priority order:
+  1. SIMULTANEOUS — one session per child, same facility, overlapping time,
+     on a shared date.
+  2. BACK_TO_BACK — one session per child, same facility, sequential in
+     time with a gap small enough to be realistic (default: <= 30 min).
+  3. PARTIAL — no combination covers every child; fall back to each
+     child's individually eligible sessions, labeled with which child(ren)
+     they're for.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, date
+from itertools import product
+from typing import Optional
+
+from scraper.normalize import Session
+
+BACK_TO_BACK_MAX_GAP_MINUTES = 30
+
+WEEKDAY_DAYS = {"Mon", "Tue", "Wed", "Thu", "Fri"}
+WEEKEND_DAYS = {"Sat", "Sun"}
+
+
+@dataclass
+class Registrant:
+    label: str          # e.g. "Kid 1" or a parent-supplied name
+    birth_date: date
+
+
+@dataclass
+class SearchPreferences:
+    day_pref: Optional[str] = None   # "weekday" | "weekend" | None
+    time_pref: Optional[str] = None  # "morning" | "afternoon" | "evening" | None
+
+
+def age_in_months(birth_date: date, as_of: date) -> int:
+    """Whole months elapsed between birth_date and as_of."""
+    months = (as_of.year - birth_date.year) * 12 + (as_of.month - birth_date.month)
+    if as_of.day < birth_date.day:
+        months -= 1
+    return max(0, months)
+
+
+def _time_to_minutes(hhmm: str) -> int:
+    h, m = map(int, hhmm.split(":"))
+    return h * 60 + m
+
+
+def _time_of_day_bucket(hhmm: str) -> str:
+    minutes = _time_to_minutes(hhmm)
+    if minutes < 12 * 60:
+        return "morning"
+    if minutes < 17 * 60:
+        return "afternoon"
+    return "evening"
+
+
+def is_future(session: Session, today: date) -> bool:
+    session_start = datetime.strptime(session.session_start_date, "%Y-%m-%d").date()
+    return session_start >= today
+
+
+def matches_day_pref(session: Session, day_pref: Optional[str]) -> bool:
+    if day_pref is None:
+        return True
+    days = set(session.days_of_week)
+    if day_pref == "weekday":
+        return bool(days & WEEKDAY_DAYS)
+    if day_pref == "weekend":
+        return bool(days & WEEKEND_DAYS)
+    return True
+
+
+def matches_time_pref(session: Session, time_pref: Optional[str]) -> bool:
+    if time_pref is None:
+        return True
+    return _time_of_day_bucket(session.start_time) == time_pref
+
+
+def eligible_sessions_for(
+    registrant: Registrant,
+    sessions: list[Session],
+    prefs: SearchPreferences,
+    today: date,
+) -> list[Session]:
+    """Sessions matching one registrant's age + all filters. Future and
+    non-full only. Age is evaluated as of each session's start date so a
+    child who will age into a class before it begins is included."""
+    result = []
+    for s in sessions:
+        if not (s.status == "open" and is_future(s, today)):
+            continue
+        if s.min_age_months is None or s.max_age_months is None:
+            continue
+        session_start = datetime.strptime(s.session_start_date, "%Y-%m-%d").date()
+        age = age_in_months(registrant.birth_date, session_start)
+        if not (s.min_age_months <= age <= s.max_age_months):
+            continue
+        if not matches_day_pref(s, prefs.day_pref):
+            continue
+        if not matches_time_pref(s, prefs.time_pref):
+            continue
+        result.append(s)
+    return result
+
+
+def _overlaps(a: Session, b: Session) -> bool:
+    if a.facility_id != b.facility_id:
+        return False
+    if not (set(a.days_of_week) & set(b.days_of_week)):
+        return False
+    a_start, a_end = _time_to_minutes(a.start_time), _time_to_minutes(a.end_time)
+    b_start, b_end = _time_to_minutes(b.start_time), _time_to_minutes(b.end_time)
+    return a_start < b_end and b_start < a_end
+
+
+def _back_to_back_gap_minutes(a: Session, b: Session) -> Optional[int]:
+    """Returns the gap in minutes if a ends before b starts (or vice versa)
+    at the same facility on a shared day, else None."""
+    if a.facility_id != b.facility_id:
+        return None
+    if not (set(a.days_of_week) & set(b.days_of_week)):
+        return None
+    a_start, a_end = _time_to_minutes(a.start_time), _time_to_minutes(a.end_time)
+    b_start, b_end = _time_to_minutes(b.start_time), _time_to_minutes(b.end_time)
+    if a_end <= b_start:
+        return b_start - a_end
+    if b_end <= a_start:
+        return a_start - b_end
+    return None
+
+
+@dataclass
+class MatchResult:
+    tier: str  # "simultaneous" | "back_to_back" | "partial"
+    sessions_by_registrant: dict  # {registrant_label: Session}
+
+
+def find_matches(
+    registrants: list[Registrant],
+    sessions: list[Session],
+    prefs: SearchPreferences,
+    today: Optional[date] = None,
+) -> list[MatchResult]:
+    if today is None:
+        today = date.today()
+
+    per_registrant_eligible = {
+        r.label: eligible_sessions_for(r, sessions, prefs, today) for r in registrants
+    }
+
+    if len(registrants) == 1:
+        r = registrants[0]
+        return [
+            MatchResult(tier="partial", sessions_by_registrant={r.label: s})
+            for s in per_registrant_eligible[r.label]
+        ]
+
+    # Try every combination of one eligible session per registrant.
+    labels = [r.label for r in registrants]
+    combos = list(product(*[per_registrant_eligible[label] for label in labels]))
+
+    simultaneous: list[MatchResult] = []
+    back_to_back: list[MatchResult] = []
+
+    for combo in combos:
+        pairs_ok_simultaneous = all(
+            _overlaps(combo[i], combo[j])
+            for i in range(len(combo))
+            for j in range(i + 1, len(combo))
+        )
+        if pairs_ok_simultaneous:
+            simultaneous.append(
+                MatchResult(
+                    tier="simultaneous",
+                    sessions_by_registrant=dict(zip(labels, combo)),
+                )
+            )
+            continue
+
+        pairs_ok_b2b = all(
+            (
+                _overlaps(combo[i], combo[j])
+                or (
+                    (gap := _back_to_back_gap_minutes(combo[i], combo[j])) is not None
+                    and gap <= BACK_TO_BACK_MAX_GAP_MINUTES
+                )
+            )
+            for i in range(len(combo))
+            for j in range(i + 1, len(combo))
+        )
+        if pairs_ok_b2b:
+            back_to_back.append(
+                MatchResult(
+                    tier="back_to_back",
+                    sessions_by_registrant=dict(zip(labels, combo)),
+                )
+            )
+
+    if simultaneous:
+        return simultaneous
+    if back_to_back:
+        return back_to_back
+
+    # Tier 3: partial — per-child eligible sessions, labeled individually.
+    partial = []
+    for label, sessions_for_reg in per_registrant_eligible.items():
+        for s in sessions_for_reg:
+            partial.append(MatchResult(tier="partial", sessions_by_registrant={label: s}))
+    return partial

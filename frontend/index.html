@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portland Parks &amp; Rec Class Finder</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    color: #1a1a1a;
+    background: #f5f5f0;
+    min-height: 100vh;
+  }
+
+  header {
+    background: #2d6a2d;
+    color: #fff;
+    padding: 24px 0;
+  }
+  header .inner { max-width: 760px; margin: 0 auto; padding: 0 20px; }
+  header h1 { font-size: 1.5rem; font-weight: 700; }
+  header p { margin-top: 4px; opacity: 0.85; font-size: 0.95rem; }
+
+  main { max-width: 760px; margin: 32px auto; padding: 0 20px 64px; }
+
+  /* Form card */
+  .form-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 28px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+
+  .section-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #666;
+    margin-bottom: 12px;
+  }
+
+  .child-section { margin-bottom: 24px; }
+
+  .child-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .child-row input[type="text"] {
+    flex: 2;
+    padding: 8px 12px;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    font-size: 0.95rem;
+  }
+  .child-row .dob-group {
+    flex: 3;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .child-row .dob-group label { font-size: 0.85rem; color: #555; white-space: nowrap; }
+  .child-row .dob-group input[type="date"] {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    font-size: 0.95rem;
+  }
+  .child-row .remove-btn {
+    background: none;
+    border: none;
+    color: #999;
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    line-height: 1;
+  }
+  .child-row .remove-btn:hover { color: #c00; background: #fee; }
+
+  #add-child {
+    background: none;
+    border: 1px dashed #aaa;
+    color: #555;
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  #add-child:hover { border-color: #2d6a2d; color: #2d6a2d; }
+
+  .prefs-section { margin-bottom: 24px; }
+  .prefs-row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .pref-group { display: flex; flex-direction: column; gap: 4px; }
+  .pref-group label { font-size: 0.85rem; color: #555; }
+  .pref-group select {
+    padding: 8px 12px;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    background: #fff;
+    min-width: 180px;
+  }
+
+  #search-btn {
+    width: 100%;
+    background: #2d6a2d;
+    color: #fff;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  #search-btn:hover { background: #245624; }
+  #search-btn:disabled { background: #aaa; cursor: default; }
+
+  /* Results */
+  #results { margin-top: 28px; }
+
+  .status-msg {
+    text-align: center;
+    color: #666;
+    padding: 32px 0;
+    font-size: 0.95rem;
+  }
+  .status-msg.error { color: #b00; }
+
+  .tier-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .tier-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .tier-badge.simultaneous { background: #d4edda; color: #145a1e; }
+  .tier-badge.back_to_back { background: #cce5ff; color: #0c4a8a; }
+  .tier-badge.partial { background: #e9e9e9; color: #444; }
+  .tier-desc { font-size: 0.9rem; color: #555; }
+
+  /* Group card: one row per back-to-back / simultaneous result */
+  .group-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.07);
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .group-card .session-slot { flex: 1; min-width: 220px; }
+  .group-divider {
+    display: flex;
+    align-items: center;
+    color: #bbb;
+    font-size: 1.2rem;
+    padding-top: 24px;
+  }
+
+  /* Single session card (partial) */
+  .session-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.07);
+  }
+
+  .child-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 4px;
+  }
+  .session-name {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .session-facility {
+    font-size: 0.88rem;
+    color: #2d6a2d;
+    margin-bottom: 8px;
+  }
+  .session-meta {
+    font-size: 0.85rem;
+    color: #555;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .session-meta span::before { content: ''; }
+  .meta-days::before  { content: '📅 '; }
+  .meta-time::before  { content: '⏰ '; }
+  .meta-dates::before { content: '🗓 '; }
+  .meta-spots::before { content: '✓ '; }
+  .meta-price::before { content: '$ '; }
+
+  .register-btn {
+    display: inline-block;
+    padding: 7px 16px;
+    background: #2d6a2d;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .register-btn:hover { background: #245624; }
+
+  .results-count {
+    font-size: 0.85rem;
+    color: #888;
+    margin-bottom: 16px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="inner">
+    <h1>Portland Parks &amp; Rec Class Finder</h1>
+    <p>Find classes that fit your kids' ages and schedule — without paging through ActiveNet.</p>
+  </div>
+</header>
+
+<main>
+  <div class="form-card">
+    <form id="search-form">
+
+      <div class="child-section">
+        <div class="section-label">Children</div>
+        <div id="registrants"></div>
+        <button type="button" id="add-child">+ Add another child</button>
+      </div>
+
+      <div class="prefs-section">
+        <div class="section-label">Schedule preference</div>
+        <div class="prefs-row">
+          <div class="pref-group">
+            <label for="day-pref">Days</label>
+            <select id="day-pref">
+              <option value="">Any</option>
+              <option value="weekday">Weekdays (Mon–Fri)</option>
+              <option value="weekend">Weekends (Sat–Sun)</option>
+            </select>
+          </div>
+          <div class="pref-group">
+            <label for="time-pref">Time of day</label>
+            <select id="time-pref">
+              <option value="">Any time</option>
+              <option value="morning">Morning (before noon)</option>
+              <option value="afternoon">Afternoon (noon–5 pm)</option>
+              <option value="evening">Evening (after 5 pm)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" id="search-btn">Find classes</button>
+    </form>
+  </div>
+
+  <div id="results"></div>
+</main>
+
+<script>
+const API = 'http://localhost:8000';
+
+// ── Child rows ──────────────────────────────────────────────────────────────
+
+const registrantsDiv = document.getElementById('registrants');
+
+function addChildRow(defaultName = '') {
+  const row = document.createElement('div');
+  row.className = 'child-row';
+  // Default max date: today. Kids must be born before today.
+  const today = new Date().toISOString().slice(0, 10);
+  row.innerHTML = `
+    <input type="text" class="reg-label" placeholder="Name (e.g. Ella)" value="${defaultName}" aria-label="Child name">
+    <div class="dob-group">
+      <label>Date of birth</label>
+      <input type="date" class="reg-dob" max="${today}" required aria-label="Date of birth">
+    </div>
+    <button type="button" class="remove-btn" title="Remove">×</button>
+  `;
+  row.querySelector('.remove-btn').addEventListener('click', () => {
+    if (registrantsDiv.children.length > 1) row.remove();
+  });
+  registrantsDiv.appendChild(row);
+}
+
+addChildRow('Kid 1');
+
+document.getElementById('add-child').addEventListener('click', () => {
+  addChildRow(`Kid ${registrantsDiv.children.length + 1}`);
+});
+
+// ── Format helpers ──────────────────────────────────────────────────────────
+
+function fmt24to12(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  const period = h < 12 ? 'am' : 'pm';
+  const h12 = h % 12 || 12;
+  return m === 0 ? `${h12}${period}` : `${h12}:${String(m).padStart(2,'0')}${period}`;
+}
+
+function fmtDays(days) {
+  const ABBR = { Mon:'M', Tue:'Tu', Wed:'W', Thu:'Th', Fri:'F', Sat:'Sa', Sun:'Su' };
+  const WEEKDAYS = ['Mon','Tue','Wed','Thu','Fri'];
+  const WEEKEND  = ['Sat','Sun'];
+  const set = new Set(days);
+  if (WEEKDAYS.every(d => set.has(d)) && days.length === 5) return 'Mon–Fri';
+  if (WEEKEND.every(d => set.has(d)) && days.length === 2) return 'Sat–Sun';
+  return days.map(d => ABBR[d] || d).join('/');
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function fmtDateRange(start, end) {
+  if (!end || end === start) return fmtDate(start);
+  const s = fmtDate(start), e = fmtDate(end);
+  // If same month: "Aug 3–24"
+  const sm = s.split(' ')[0], em = e.split(' ')[0];
+  if (sm === em) return `${s}–${e.split(' ')[1]}`;
+  return `${s} – ${e}`;
+}
+
+function fmtAge(min, max) {
+  function ageStr(months) {
+    if (!months) return null;
+    const y = Math.floor(months / 12), m = months % 12;
+    if (y === 0) return `${m}mo`;
+    if (m === 0) return `${y}yr`;
+    return `${y}yr ${m}mo`;
+  }
+  const lo = ageStr(min), hi = ageStr(max);
+  if (lo && hi) return `${lo} – ${hi}`;
+  if (lo) return `${lo}+`;
+  return '';
+}
+
+// ── Session card HTML ───────────────────────────────────────────────────────
+
+function sessionSlotHTML(childLabel, session) {
+  const days  = fmtDays(session.days_of_week);
+  const time  = `${fmt24to12(session.start_time)} – ${fmt24to12(session.end_time)}`;
+  const dates = fmtDateRange(session.session_start_date, session.session_end_date);
+  const spots = session.spots_available != null ? `${session.spots_available} spot${session.spots_available !== 1 ? 's' : ''} left` : '';
+  const price = session.price != null ? `$${Math.round(session.price)}` : '';
+  const facility = session.facility_name || session.facility_id.replace(/_/g, ' ');
+  const regUrl = session.registration_url;
+
+  return `
+    ${childLabel ? `<div class="child-label">${childLabel}</div>` : ''}
+    <div class="session-name">${session.activity_name}</div>
+    <div class="session-facility">${facility}</div>
+    <div class="session-meta">
+      <span class="meta-days">${days}</span>
+      <span class="meta-time">${time}</span>
+      ${dates ? `<span class="meta-dates">${dates}</span>` : ''}
+      ${spots ? `<span class="meta-spots">${spots}</span>` : ''}
+      ${price ? `<span class="meta-price">${price}</span>` : ''}
+    </div>
+    ${regUrl ? `<a class="register-btn" href="${regUrl}" target="_blank" rel="noopener">Register ↗</a>` : ''}
+  `;
+}
+
+// ── Render results ──────────────────────────────────────────────────────────
+
+const TIER_META = {
+  simultaneous: {
+    label: 'Same time',
+    cls: 'simultaneous',
+    desc: 'All kids can be in class at the same time and place.',
+  },
+  back_to_back: {
+    label: 'Back-to-back',
+    cls: 'back_to_back',
+    desc: 'Classes at the same location, one right after the other.',
+  },
+  partial: {
+    label: 'Individual matches',
+    cls: 'partial',
+    desc: 'No shared slot found — showing the best options per child.',
+  },
+};
+
+function renderResults(data) {
+  const container = document.getElementById('results');
+
+  if (!data.results || data.results.length === 0) {
+    container.innerHTML = '<p class="status-msg">No matching classes found. Try widening your preferences.</p>';
+    return;
+  }
+
+  const tier = data.tier;
+  const meta = TIER_META[tier] || { label: tier, cls: 'partial', desc: '' };
+  const isGroup = tier === 'simultaneous' || tier === 'back_to_back';
+
+  let html = `
+    <div class="tier-header">
+      <span class="tier-badge ${meta.cls}">${meta.label}</span>
+      <span class="tier-desc">${meta.desc}</span>
+    </div>
+    <div class="results-count">${data.results.length} result${data.results.length !== 1 ? 's' : ''}</div>
+  `;
+
+  for (const result of data.results) {
+    const entries = Object.entries(result.sessions); // [[label, session], ...]
+
+    if (isGroup && entries.length > 1) {
+      let inner = '';
+      entries.forEach(([label, session], i) => {
+        if (i > 0) inner += '<div class="group-divider">→</div>';
+        inner += `<div class="session-slot">${sessionSlotHTML(label, session)}</div>`;
+      });
+      html += `<div class="group-card">${inner}</div>`;
+    } else {
+      const [label, session] = entries[0];
+      const showLabel = data.results.some(r => Object.keys(r.sessions)[0] !== label) || entries.length > 1;
+      html += `<div class="session-card">${sessionSlotHTML(showLabel ? label : '', session)}</div>`;
+    }
+  }
+
+  container.innerHTML = html;
+}
+
+// ── Submit ──────────────────────────────────────────────────────────────────
+
+document.getElementById('search-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('search-btn');
+  const container = document.getElementById('results');
+
+  const registrants = [...registrantsDiv.children].map((row, i) => {
+    const label      = row.querySelector('.reg-label').value.trim() || `Kid ${i + 1}`;
+    const birth_date = row.querySelector('.reg-dob').value;
+    return { label, birth_date };
+  });
+
+  if (registrants.some(r => !r.birth_date)) {
+    container.innerHTML = '<p class="status-msg error">Please enter a date of birth for each child.</p>';
+    return;
+  }
+
+  const day_pref  = document.getElementById('day-pref').value  || null;
+  const time_pref = document.getElementById('time-pref').value || null;
+
+  btn.disabled = true;
+  btn.textContent = 'Searching…';
+  container.innerHTML = '<p class="status-msg">Looking for classes…</p>';
+
+  try {
+    const resp = await fetch(`${API}/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ registrants, day_pref, time_pref }),
+    });
+
+    if (resp.status === 503) {
+      const err = await resp.json();
+      container.innerHTML = `<p class="status-msg error">${err.detail}</p>`;
+      return;
+    }
+    if (!resp.ok) {
+      throw new Error(`Server error ${resp.status}`);
+    }
+
+    renderResults(await resp.json());
+  } catch (err) {
+    container.innerHTML = `<p class="status-msg error">Could not reach the server. Make sure it's running:<br><code>python3 -m uvicorn backend.api:app --reload</code></p>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Find classes';
+  }
+});
+</script>
+</body>
+</html>

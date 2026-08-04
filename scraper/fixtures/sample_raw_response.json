@@ -1,0 +1,118 @@
+{
+  "headers": {
+    "response_code": "0000",
+    "response_message": "Successful",
+    "page_info": {
+      "order_by": "Name",
+      "order_option": "ASC",
+      "total_page": 1,
+      "total_records_per_page": 20,
+      "total_records": 5,
+      "page_number": 1
+    }
+  },
+  "body": {
+    "activity_items": [
+      {
+        "id": 1001,
+        "name": "Little Swimmers - Level 1",
+        "detail_url": "https://apm.activecommunities.com/portlandparks/Activity_Search/little-swimmers-level-1/1001?locale=en-US",
+        "enroll_now": {
+          "href": "https://anc.apm.activecommunities.com/portlandparks/activity/search/enroll/1001?locale=en-US",
+          "label": "Enroll Now"
+        },
+        "location": {"label": "Sellwood Pool", "href": ""},
+        "age_min_year": 1, "age_min_month": 0, "age_min_week": 0,
+        "age_max_year": 2, "age_max_month": 11, "age_max_week": 0,
+        "days_of_week": "Tue, Thu",
+        "time_range": "9:00 AM - 9:30 AM",
+        "date_range_start": "2026-09-08",
+        "date_range_end": "2026-09-24",
+        "openings": "4",
+        "total_open": 10,
+        "already_enrolled": 6,
+        "search_from_price": 85.0
+      },
+      {
+        "id": 1002,
+        "name": "Preschool Soccer",
+        "detail_url": "https://apm.activecommunities.com/portlandparks/Activity_Search/preschool-soccer/1002?locale=en-US",
+        "enroll_now": {
+          "href": "https://anc.apm.activecommunities.com/portlandparks/activity/search/enroll/1002?locale=en-US",
+          "label": "Enroll Now"
+        },
+        "location": {"label": "Sellwood Pool", "href": ""},
+        "age_min_year": 3, "age_min_month": 0, "age_min_week": 0,
+        "age_max_year": 5, "age_max_month": 0, "age_max_week": 0,
+        "days_of_week": "Tue, Thu",
+        "time_range": "9:30 AM - 10:15 AM",
+        "date_range_start": "2026-09-08",
+        "date_range_end": "2026-09-24",
+        "openings": "2",
+        "total_open": 8,
+        "already_enrolled": 6,
+        "search_from_price": 60.0
+      },
+      {
+        "id": 1003,
+        "name": "Toddler Art Time",
+        "detail_url": "https://apm.activecommunities.com/portlandparks/Activity_Search/toddler-art-time/1003?locale=en-US",
+        "enroll_now": {
+          "href": "https://anc.apm.activecommunities.com/portlandparks/activity/search/enroll/1003?locale=en-US",
+          "label": "Enroll Now"
+        },
+        "location": {"label": "Woodstock Community Center", "href": ""},
+        "age_min_year": 1, "age_min_month": 0, "age_min_week": 0,
+        "age_max_year": 2, "age_max_month": 11, "age_max_week": 0,
+        "days_of_week": "Sat",
+        "time_range": "10:00 AM - 10:45 AM",
+        "date_range_start": "2026-09-05",
+        "date_range_end": "2026-09-26",
+        "openings": "0",
+        "total_open": 8,
+        "already_enrolled": 8,
+        "search_from_price": 45.0
+      },
+      {
+        "id": 1004,
+        "name": "Kids Ceramics",
+        "detail_url": "https://apm.activecommunities.com/portlandparks/Activity_Search/kids-ceramics/1004?locale=en-US",
+        "enroll_now": {
+          "href": "https://anc.apm.activecommunities.com/portlandparks/activity/search/enroll/1004?locale=en-US",
+          "label": "Enroll Now"
+        },
+        "location": {"label": "Woodstock Community Center", "href": ""},
+        "age_min_year": 5, "age_min_month": 0, "age_min_week": 0,
+        "age_max_year": 8, "age_max_month": 0, "age_max_week": 0,
+        "days_of_week": "Sat",
+        "time_range": "10:15 AM - 11:00 AM",
+        "date_range_start": "2026-09-05",
+        "date_range_end": "2026-09-26",
+        "openings": "6",
+        "total_open": 12,
+        "already_enrolled": 6,
+        "search_from_price": 70.0
+      },
+      {
+        "id": 1005,
+        "name": "Adult Yoga",
+        "detail_url": "https://apm.activecommunities.com/portlandparks/Activity_Search/adult-yoga/1005?locale=en-US",
+        "enroll_now": {
+          "href": "https://anc.apm.activecommunities.com/portlandparks/activity/search/enroll/1005?locale=en-US",
+          "label": "Enroll Now"
+        },
+        "location": {"label": "Mt Scott Community Center", "href": ""},
+        "age_min_year": 18, "age_min_month": 0, "age_min_week": 0,
+        "age_max_year": 99, "age_max_month": 0, "age_max_week": 0,
+        "days_of_week": "Mon, Wed",
+        "time_range": "6:00 PM - 7:00 PM",
+        "date_range_start": "2026-09-01",
+        "date_range_end": "2026-10-01",
+        "openings": "0",
+        "total_open": 20,
+        "already_enrolled": 20,
+        "search_from_price": 90.0
+      }
+    ]
+  }
+}
