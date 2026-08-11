@@ -28,7 +28,10 @@ import os
 import requests
 
 _BASE = "https://anc.apm.activecommunities.com/portlandparks"
-_PAGE_SIZE = 20
+# The server's pagination is erratic -- most page requests just return the
+# same first page regardless of current_page. A bigger page size means fewer
+# total pages are needed, so each "lucky" hit covers more of the catalog.
+_PAGE_SIZE = 100
 
 # Full search pattern the real browser sends. activity_select_param=2 is
 # required — without it the server ignores current_page and always returns
