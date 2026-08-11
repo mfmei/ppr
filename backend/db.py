@@ -1,10 +1,23 @@
 import json
 import sqlite3
 from pathlib import Path
+from typing import Dict, Optional, Tuple
 
 from scraper.normalize import Session
 
 DB_PATH = Path(__file__).parent.parent / "data" / "sessions.db"
+
+
+def load_facility_coords() -> Dict[str, Tuple[float, float]]:
+    """Returns {facility_id: (lat, lon)} for facilities with known coordinates."""
+    if not DB_PATH.exists():
+        return {}
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        "SELECT facility_id, lat, lon FROM facilities WHERE lat IS NOT NULL"
+    ).fetchall()
+    conn.close()
+    return {row[0]: (row[1], row[2]) for row in rows}
 
 
 def load_sessions() -> list[Session]:
