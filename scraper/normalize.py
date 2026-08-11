@@ -72,6 +72,55 @@ def _facility_id(location_label: str) -> str:
     return location_label.lower().replace(" ", "_").replace("&", "and")
 
 
+# Raw ActiveNet category prefixes that are really just sub-crafts of Art —
+# folded together so the filter list isn't fragmented into tiny buckets.
+_CATEGORY_ALIASES = {
+    "Calligraphy": "Art",
+    "Ceramics": "Art",
+    "Fiber Arts": "Art",
+    "Mixed Media": "Art",
+    "Sewing": "Art",
+    "Ballet": "Dance",
+    "Creative Dance": "Dance",
+    # These activity names use the pool's name in place of a category
+    # (e.g. "Creston - Goldfish", "EPCC - Sea Lion" are swim lesson levels).
+    "Creston": "Aquatics",
+    "EPCC": "Aquatics",
+    "Grant": "Aquatics",
+    "Ida B. Wells": "Aquatics",
+    "Peninsula": "Aquatics",
+}
+
+# Raw ActiveNet category prefixes that aren't useful as a user-facing filter
+# (internal programs, one-off series, adult/senior-only programs, etc.) —
+# treated as uncategorized.
+_CATEGORY_REMOVED = {
+    "Adaptive",
+    "Summer Swim Team",
+    "TeenForce",
+    "Continuing Education",
+    "Conversations on Aging",
+    "Book Arts & Woodworking",  # 18+ only
+    "Hiking & Walking",         # 60+ only
+    "Meet Us There AR",         # 18+ only
+    "Van Trip",                 # 60+ only
+    "Virtual Fitness",          # 60+ only
+    "Virtual Programming",      # 60+ only
+    "Camp",
+}
+
+
+def _derive_category(activity_name: str) -> Optional[str]:
+    """ActiveNet activity names are consistently "Category - Specific Class"
+    (e.g. "Adaptive - Bocce Ball", "Art - Extravaganza : Mixed Media")."""
+    if " - " not in activity_name:
+        return None
+    raw = activity_name.split(" - ", 1)[0].strip()
+    if raw in _CATEGORY_REMOVED or raw.startswith("Hike for Health"):
+        return None
+    return _CATEGORY_ALIASES.get(raw, raw)
+
+
 def normalize_response(raw: dict) -> tuple[list[Facility], list[Session]]:
     facilities: dict[str, Facility] = {}
     sessions: list[Session] = []
@@ -102,7 +151,7 @@ def normalize_response(raw: dict) -> tuple[list[Facility], list[Session]]:
             Session(
                 session_id=str(item["id"]),
                 activity_name=item["name"],
-                category=None,
+                category=_derive_category(item["name"]),
                 facility_id=fid,
                 facility_name=loc_label,
                 min_age_months=min_months if min_months else None,

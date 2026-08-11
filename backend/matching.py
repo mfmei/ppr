@@ -35,6 +35,7 @@ class Registrant:
 class SearchPreferences:
     day_pref: Optional[str] = None   # "weekday" | "weekend" | None
     time_pref: Optional[str] = None  # "morning" | "afternoon" | "evening" | None
+    categories: Optional[list[str]] = None  # e.g. ["Aquatics", "Art"]; None/empty = any
 
 
 def age_in_months(birth_date: date, as_of: date) -> int:
@@ -81,31 +82,60 @@ def matches_time_pref(session: Session, time_pref: Optional[str]) -> bool:
     return _time_of_day_bucket(session.start_time) == time_pref
 
 
+def matches_category_pref(session: Session, categories: Optional[list[str]]) -> bool:
+    if not categories:
+        return True
+    return session.category in categories
+
+
+def _age_and_pref_match(
+    registrant: Registrant,
+    session: Session,
+    prefs: SearchPreferences,
+    today: date,
+) -> bool:
+    """True if session is future, fits registrant's age at session start, and matches prefs."""
+    if not is_future(session, today):
+        return False
+    if session.min_age_months is None or session.max_age_months is None:
+        return False
+    session_start = datetime.strptime(session.session_start_date, "%Y-%m-%d").date()
+    age = age_in_months(registrant.birth_date, session_start)
+    if not (session.min_age_months <= age <= session.max_age_months):
+        return False
+    if not matches_day_pref(session, prefs.day_pref):
+        return False
+    if not matches_time_pref(session, prefs.time_pref):
+        return False
+    if not matches_category_pref(session, prefs.categories):
+        return False
+    return True
+
+
 def eligible_sessions_for(
     registrant: Registrant,
     sessions: list[Session],
     prefs: SearchPreferences,
     today: date,
 ) -> list[Session]:
-    """Sessions matching one registrant's age + all filters. Future and
-    non-full only. Age is evaluated as of each session's start date so a
-    child who will age into a class before it begins is included."""
-    result = []
-    for s in sessions:
-        if not (s.status == "open" and is_future(s, today)):
-            continue
-        if s.min_age_months is None or s.max_age_months is None:
-            continue
-        session_start = datetime.strptime(s.session_start_date, "%Y-%m-%d").date()
-        age = age_in_months(registrant.birth_date, session_start)
-        if not (s.min_age_months <= age <= s.max_age_months):
-            continue
-        if not matches_day_pref(s, prefs.day_pref):
-            continue
-        if not matches_time_pref(s, prefs.time_pref):
-            continue
-        result.append(s)
-    return result
+    """Open sessions matching age + prefs. Age evaluated at session start date."""
+    return [
+        s for s in sessions
+        if s.status == "open" and _age_and_pref_match(registrant, s, prefs, today)
+    ]
+
+
+def full_sessions_for(
+    registrant: Registrant,
+    sessions: list[Session],
+    prefs: SearchPreferences,
+    today: date,
+) -> list[Session]:
+    """Full sessions matching age + prefs — shown separately so parents can waitlist."""
+    return [
+        s for s in sessions
+        if s.status == "full" and _age_and_pref_match(registrant, s, prefs, today)
+    ]
 
 
 def _overlaps(a: Session, b: Session) -> bool:

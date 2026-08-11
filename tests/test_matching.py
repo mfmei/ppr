@@ -1,7 +1,10 @@
 from datetime import date
 
 from scraper.normalize import load_fixture
-from backend.matching import Registrant, SearchPreferences, find_matches, eligible_sessions_for, age_in_months
+from backend.matching import (
+    Registrant, SearchPreferences, find_matches, eligible_sessions_for,
+    age_in_months, matches_category_pref,
+)
 
 FIXTURE_PATH = "scraper/fixtures/sample_raw_response.json"
 TODAY = date(2026, 8, 1)
@@ -106,3 +109,29 @@ def test_day_and_time_preferences_filter_correctly():
     eligible = eligible_sessions_for(TODDLER, sessions, weekend_only, TODAY)
     # 1001 is Tue/Thu (weekday) so should be excluded under weekend_only
     assert all("Sat" in s.days_of_week or "Sun" in s.days_of_week for s in eligible)
+
+
+# ── category preference ─────────────────────────────────────────────────────
+
+def test_category_pref_filters_to_selected_categories():
+    _facilities, sessions = load_fixture(FIXTURE_PATH)
+    aquatics_only = SearchPreferences(categories=["Aquatics"])
+    eligible = eligible_sessions_for(TODDLER, sessions, aquatics_only, TODAY)
+    # 1001 "Aquatics - Little Swimmers Level 1" fits; 1003 "Art - ..." should be excluded
+    ids = {s.session_id for s in eligible}
+    assert "1001" in ids
+    assert all(s.category == "Aquatics" for s in eligible)
+
+
+def test_no_category_pref_matches_any_category():
+    _facilities, sessions = load_fixture(FIXTURE_PATH)
+    assert all(matches_category_pref(s, None) for s in sessions)
+    assert all(matches_category_pref(s, []) for s in sessions)
+
+
+def test_category_pref_matches_any_of_multiple_selected():
+    _facilities, sessions = load_fixture(FIXTURE_PATH)
+    by_id = {s.session_id: s for s in sessions}
+    assert matches_category_pref(by_id["1001"], ["Aquatics", "Fitness"])  # Aquatics
+    assert matches_category_pref(by_id["1005"], ["Aquatics", "Dance"])  # Dance
+    assert not matches_category_pref(by_id["1002"], ["Aquatics", "Dance"])  # Sports

@@ -230,11 +230,120 @@
   }
   .register-btn:hover { background: #245624; }
 
+  .waitlist-btn {
+    display: inline-block;
+    padding: 7px 16px;
+    background: none;
+    color: #888;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1px solid #ccc;
+  }
+  .waitlist-btn:hover { border-color: #888; color: #555; }
+
+  .full-section { margin-top: 32px; }
+  .full-section-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #aaa;
+    margin-bottom: 12px;
+  }
+  .session-card.is-full {
+    opacity: 0.6;
+    background: #f9f9f9;
+  }
+  .full-badge {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: #e9e9e9;
+    color: #888;
+    margin-bottom: 6px;
+  }
+
   .results-count {
     font-size: 0.85rem;
     color: #888;
     margin-bottom: 16px;
   }
+
+  .optional-label {
+    font-weight: 400;
+    color: #aaa;
+    font-size: 0.8rem;
+  }
+  .addr-group { width: 100%; position: relative; }
+  .addr-group input[type="text"] {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    box-sizing: border-box;
+  }
+  .addr-group input[type="text"].addr-valid {
+    border-color: #27ae60;
+  }
+  .addr-suggestions {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0; right: 0;
+    background: #fff;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    z-index: 100;
+    overflow: hidden;
+  }
+  .addr-suggestion {
+    padding: 9px 12px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .addr-suggestion:last-child { border-bottom: none; }
+  .addr-suggestion:hover, .addr-suggestion.focused { background: #f0f6ff; }
+  .field-error {
+    color: #c0392b;
+    font-size: 0.82rem;
+    margin-top: 4px;
+  }
+  .category-options { display: flex; flex-wrap: wrap; gap: 8px; }
+  .category-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 14px;
+    border: 1px solid #d0d0d0;
+    border-radius: 20px;
+    font-size: 0.88rem;
+    cursor: pointer;
+    user-select: none;
+    background: #fff;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  .category-chip input { display: none; }
+  .category-chip.selected {
+    background: #e8f3e8;
+    border-color: #2d6a2d;
+    color: #245624;
+    font-weight: 600;
+  }
+  .category-chip:hover { border-color: #2d6a2d; }
+  .meta-dist {
+    color: #2a7ae2;
+    font-weight: 600;
+    font-size: 0.78rem;
+    margin-left: 4px;
+  }
+  .session-facility { color: #666; font-size: 0.88rem; margin-bottom: 8px; }
 </style>
 </head>
 <body>
@@ -279,6 +388,21 @@
         </div>
       </div>
 
+      <div class="prefs-section">
+        <div class="section-label">Activities <span class="optional-label">(optional — leave blank for all)</span></div>
+        <div id="category-options" class="category-options"></div>
+      </div>
+
+      <div class="prefs-section">
+        <div class="section-label">Sort by distance <span class="optional-label">(optional)</span></div>
+        <div class="pref-group addr-group">
+          <label for="address">Your address</label>
+          <input type="text" id="address" placeholder="e.g. 1234 NE Alberta St" autocomplete="off" spellcheck="false">
+          <div id="addr-suggestions" class="addr-suggestions" style="display:none"></div>
+          <div id="address-error" class="field-error" style="display:none"></div>
+        </div>
+      </div>
+
       <button type="submit" id="search-btn">Find classes</button>
     </form>
   </div>
@@ -287,7 +411,7 @@
 </main>
 
 <script>
-const API = 'http://localhost:8000';
+const API = '';
 
 // ── Child rows ──────────────────────────────────────────────────────────────
 
@@ -307,7 +431,10 @@ function addChildRow(defaultName = '') {
     <button type="button" class="remove-btn" title="Remove">×</button>
   `;
   row.querySelector('.remove-btn').addEventListener('click', () => {
-    if (registrantsDiv.children.length > 1) row.remove();
+    if (registrantsDiv.children.length > 1) {
+      row.remove();
+      refreshCategories();
+    }
   });
   registrantsDiv.appendChild(row);
 }
@@ -317,6 +444,132 @@ addChildRow('Kid 1');
 document.getElementById('add-child').addEventListener('click', () => {
   addChildRow(`Kid ${registrantsDiv.children.length + 1}`);
 });
+
+// ── Category chips ───────────────────────────────────────────────────────────
+// Re-fetched whenever a child's DOB changes, so only categories with an
+// age-eligible session for at least one entered child are offered.
+
+const categoryOptions = document.getElementById('category-options');
+
+function currentBirthDates() {
+  return [...registrantsDiv.querySelectorAll('.reg-dob')]
+    .map(input => input.value)
+    .filter(Boolean);
+}
+
+let categoriesRequestId = 0;
+
+async function refreshCategories() {
+  const requestId = ++categoriesRequestId;
+  const previouslySelected = new Set(
+    [...categoryOptions.querySelectorAll('input:checked')].map(cb => cb.value)
+  );
+
+  try {
+    const params = new URLSearchParams();
+    currentBirthDates().forEach(bd => params.append('birth_dates', bd));
+    const resp = await fetch(`${API}/categories?${params}`);
+    const data = await resp.json();
+    if (requestId !== categoriesRequestId) return; // a newer request superseded this one
+    categoryOptions.innerHTML = '';
+    data.categories.forEach((category) => {
+      const chip = document.createElement('label');
+      chip.className = 'category-chip';
+      chip.innerHTML = `<input type="checkbox" value="${category}"> ${category}`;
+      const checkbox = chip.querySelector('input');
+      if (previouslySelected.has(category)) {
+        checkbox.checked = true;
+        chip.classList.add('selected');
+      }
+      checkbox.addEventListener('change', () => {
+        chip.classList.toggle('selected', checkbox.checked);
+      });
+      categoryOptions.appendChild(chip);
+    });
+  } catch (_) {
+    if (requestId === categoriesRequestId) categoryOptions.innerHTML = '';
+  }
+}
+
+// <input type="date"> fires a "change" event on every partially-typed digit
+// (e.g. "0002", "0020", "0202" en route to "2024"), so debounce.
+let categoriesDebounce = null;
+registrantsDiv.addEventListener('change', (e) => {
+  if (!e.target.classList.contains('reg-dob')) return;
+  clearTimeout(categoriesDebounce);
+  categoriesDebounce = setTimeout(refreshCategories, 400);
+});
+
+refreshCategories();
+
+// ── Address autocomplete ─────────────────────────────────────────────────────
+
+const addrInput = document.getElementById('address');
+const addrSuggestions = document.getElementById('addr-suggestions');
+let addrCoords = null;   // {lat, lon} once user selects a suggestion
+let addrDebounce = null;
+let focusedIdx = -1;
+
+function hideSuggestions() {
+  addrSuggestions.style.display = 'none';
+  addrSuggestions.innerHTML = '';
+  focusedIdx = -1;
+}
+
+function selectSuggestion(label, lat, lon) {
+  addrInput.value = label;
+  addrCoords = { lat, lon };
+  addrInput.classList.add('addr-valid');
+  document.getElementById('address-error').style.display = 'none';
+  hideSuggestions();
+}
+
+function updateFocus(items) {
+  items.forEach((el, i) => el.classList.toggle('focused', i === focusedIdx));
+}
+
+addrInput.addEventListener('input', () => {
+  addrInput.classList.remove('addr-valid');
+  addrCoords = null;
+  clearTimeout(addrDebounce);
+  const q = addrInput.value.trim();
+  if (q.length < 4) { hideSuggestions(); return; }
+
+  addrDebounce = setTimeout(async () => {
+    try {
+      const resp = await fetch(`${API}/geocode?q=${encodeURIComponent(q)}`);
+      const data = await resp.json();
+      if (!data.suggestions.length) { hideSuggestions(); return; }
+
+      addrSuggestions.innerHTML = '';
+      focusedIdx = -1;
+      data.suggestions.forEach(({ label, lat, lon }) => {
+        const el = document.createElement('div');
+        el.className = 'addr-suggestion';
+        el.textContent = label;
+        el.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          selectSuggestion(label, lat, lon);
+        });
+        addrSuggestions.appendChild(el);
+      });
+      addrSuggestions.style.display = 'block';
+    } catch (_) { hideSuggestions(); }
+  }, 350);
+});
+
+addrInput.addEventListener('keydown', (e) => {
+  const items = [...addrSuggestions.querySelectorAll('.addr-suggestion')];
+  if (!items.length) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); focusedIdx = Math.min(focusedIdx + 1, items.length - 1); updateFocus(items); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); focusedIdx = Math.max(focusedIdx - 1, 0); updateFocus(items); }
+  else if (e.key === 'Enter' && focusedIdx >= 0) {
+    e.preventDefault();
+    items[focusedIdx].dispatchEvent(new Event('mousedown'));
+  } else if (e.key === 'Escape') { hideSuggestions(); }
+});
+
+addrInput.addEventListener('blur', () => setTimeout(hideSuggestions, 150));
 
 // ── Format helpers ──────────────────────────────────────────────────────────
 
@@ -376,11 +629,12 @@ function sessionSlotHTML(childLabel, session) {
   const price = session.price != null ? `$${Math.round(session.price)}` : '';
   const facility = session.facility_name || session.facility_id.replace(/_/g, ' ');
   const regUrl = session.registration_url;
+  const dist = session.distance_miles != null ? `${session.distance_miles} mi` : '';
 
   return `
     ${childLabel ? `<div class="child-label">${childLabel}</div>` : ''}
     <div class="session-name">${session.activity_name}</div>
-    <div class="session-facility">${facility}</div>
+    <div class="session-facility">${facility}${dist ? ` <span class="meta-dist">${dist}</span>` : ''}</div>
     <div class="session-meta">
       <span class="meta-days">${days}</span>
       <span class="meta-time">${time}</span>
@@ -423,6 +677,7 @@ function renderResults(data) {
   const tier = data.tier;
   const meta = TIER_META[tier] || { label: tier, cls: 'partial', desc: '' };
   const isGroup = tier === 'simultaneous' || tier === 'back_to_back';
+  const multiChild = Object.keys(data.full_sessions || {}).length > 1;
 
   let html = `
     <div class="tier-header">
@@ -444,12 +699,47 @@ function renderResults(data) {
       html += `<div class="group-card">${inner}</div>`;
     } else {
       const [label, session] = entries[0];
-      const showLabel = data.results.some(r => Object.keys(r.sessions)[0] !== label) || entries.length > 1;
-      html += `<div class="session-card">${sessionSlotHTML(showLabel ? label : '', session)}</div>`;
+      html += `<div class="session-card">${sessionSlotHTML(multiChild ? label : '', session)}</div>`;
     }
   }
 
+  // ── Full sessions section ────────────────────────────────────────────────
+  const fullSessions = data.full_sessions || {};
+  const hasAnyFull = Object.values(fullSessions).some(arr => arr.length > 0);
+  if (hasAnyFull) {
+    const multiChild = Object.keys(fullSessions).length > 1;
+    html += `<div class="full-section"><div class="full-section-label">Also available — currently full</div>`;
+    for (const [childLabel, sessions] of Object.entries(fullSessions)) {
+      for (const session of sessions) {
+        const label = multiChild ? childLabel : '';
+        html += `<div class="session-card is-full">${sessionSlotHTMLFull(label, session)}</div>`;
+      }
+    }
+    html += `</div>`;
+  }
+
   container.innerHTML = html;
+}
+
+function sessionSlotHTMLFull(childLabel, session) {
+  const days  = fmtDays(session.days_of_week);
+  const time  = `${fmt24to12(session.start_time)} – ${fmt24to12(session.end_time)}`;
+  const dates = fmtDateRange(session.session_start_date, session.session_end_date);
+  const facility = session.facility_name || session.facility_id.replace(/_/g, ' ');
+  const regUrl = session.registration_url;
+  const dist = session.distance_miles != null ? `${session.distance_miles} mi` : '';
+  return `
+    ${childLabel ? `<div class="child-label">${childLabel}</div>` : ''}
+    <div class="full-badge">Full</div>
+    <div class="session-name">${session.activity_name}</div>
+    <div class="session-facility">${facility}${dist ? ` <span class="meta-dist">${dist}</span>` : ''}</div>
+    <div class="session-meta">
+      <span class="meta-days">${days}</span>
+      <span class="meta-time">${time}</span>
+      ${dates ? `<span class="meta-dates">${dates}</span>` : ''}
+    </div>
+    ${regUrl ? `<a class="waitlist-btn" href="${regUrl}" target="_blank" rel="noopener">View / waitlist ↗</a>` : ''}
+  `;
 }
 
 // ── Submit ──────────────────────────────────────────────────────────────────
@@ -472,6 +762,11 @@ document.getElementById('search-form').addEventListener('submit', async (e) => {
 
   const day_pref  = document.getElementById('day-pref').value  || null;
   const time_pref = document.getElementById('time-pref').value || null;
+  const categories = [...categoryOptions.querySelectorAll('input:checked')].map(cb => cb.value);
+  const address   = addrInput.value.trim() || null;
+
+  const addrError = document.getElementById('address-error');
+  addrError.style.display = 'none';
 
   btn.disabled = true;
   btn.textContent = 'Searching…';
@@ -481,12 +776,24 @@ document.getElementById('search-form').addEventListener('submit', async (e) => {
     const resp = await fetch(`${API}/search`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ registrants, day_pref, time_pref }),
+      body: JSON.stringify({
+        registrants, day_pref, time_pref, address,
+        categories: categories.length ? categories : null,
+        address_lat: addrCoords?.lat ?? null,
+        address_lon: addrCoords?.lon ?? null,
+      }),
     });
 
     if (resp.status === 503) {
       const err = await resp.json();
       container.innerHTML = `<p class="status-msg error">${err.detail}</p>`;
+      return;
+    }
+    if (resp.status === 400) {
+      const err = await resp.json();
+      addrError.textContent = err.detail;
+      addrError.style.display = 'block';
+      container.innerHTML = '';
       return;
     }
     if (!resp.ok) {

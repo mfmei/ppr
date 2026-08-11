@@ -15,7 +15,7 @@
     "activity_items": [
       {
         "id": 1001,
-        "name": "Little Swimmers - Level 1",
+        "name": "Aquatics - Little Swimmers Level 1",
         "detail_url": "https://apm.activecommunities.com/portlandparks/Activity_Search/little-swimmers-level-1/1001?locale=en-US",
         "enroll_now": {
           "href": "https://anc.apm.activecommunities.com/portlandparks/activity/search/enroll/1001?locale=en-US",
@@ -35,7 +35,7 @@
       },
       {
         "id": 1002,
-        "name": "Preschool Soccer",
+        "name": "Sports - Preschool Soccer",
         "detail_url": "https://apm.activecommunities.com/portlandparks/Activity_Search/preschool-soccer/1002?locale=en-US",
         "enroll_now": {
           "href": "https://anc.apm.activecommunities.com/portlandparks/activity/search/enroll/1002?locale=en-US",
@@ -55,7 +55,7 @@
       },
       {
         "id": 1003,
-        "name": "Toddler Art Time",
+        "name": "Art - Toddler Art Time",
         "detail_url": "https://apm.activecommunities.com/portlandparks/Activity_Search/toddler-art-time/1003?locale=en-US",
         "enroll_now": {
           "href": "https://anc.apm.activecommunities.com/portlandparks/activity/search/enroll/1003?locale=en-US",
@@ -75,7 +75,7 @@
       },
       {
         "id": 1004,
-        "name": "Kids Ceramics",
+        "name": "Art - Kids Ceramics",
         "detail_url": "https://apm.activecommunities.com/portlandparks/Activity_Search/kids-ceramics/1004?locale=en-US",
         "enroll_now": {
           "href": "https://anc.apm.activecommunities.com/portlandparks/activity/search/enroll/1004?locale=en-US",
@@ -95,7 +95,7 @@
       },
       {
         "id": 1005,
-        "name": "Adult Yoga",
+        "name": "Dance - Adult Yoga",
         "detail_url": "https://apm.activecommunities.com/portlandparks/Activity_Search/adult-yoga/1005?locale=en-US",
         "enroll_now": {
           "href": "https://anc.apm.activecommunities.com/portlandparks/activity/search/enroll/1005?locale=en-US",
