@@ -1,0 +1,34 @@
+name: Nightly scrape
+
+on:
+  schedule:
+    - cron: "0 9 * * *"  # 9am UTC (~2am Pacific)
+  workflow_dispatch: {}   # allow manual runs from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install -r requirements.txt
+
+      - name: Scrape and rebuild sessions.db
+        env:
+          ACTIVENET_COOKIE: ${{ secrets.ACTIVENET_COOKIE }}
+        run: python -m scraper.ingest
+
+      - name: Commit updated sessions.db
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f data/sessions.db
+          git diff --cached --quiet && echo "No changes" || git commit -m "Nightly scrape: refresh sessions.db"
+          git push
