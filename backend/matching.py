@@ -97,11 +97,13 @@ def _age_and_pref_match(
     """True if session is future, fits registrant's age at session start, and matches prefs."""
     if not is_future(session, today):
         return False
-    if session.min_age_months is None or session.max_age_months is None:
-        return False
     session_start = datetime.strptime(session.session_start_date, "%Y-%m-%d").date()
     age = age_in_months(registrant.birth_date, session_start)
-    if not (session.min_age_months <= age <= session.max_age_months):
+    # A missing bound means ActiveNet lists no restriction on that side
+    # (e.g. "11+" has a min but no max) -- treat as unbounded, not invalid.
+    min_age = session.min_age_months if session.min_age_months is not None else 0
+    max_age = session.max_age_months if session.max_age_months is not None else float("inf")
+    if not (min_age <= age <= max_age):
         return False
     if not matches_day_pref(session, prefs.day_pref):
         return False

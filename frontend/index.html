@@ -48,19 +48,21 @@
 
   .child-row {
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
     align-items: center;
     margin-bottom: 8px;
   }
   .child-row input[type="text"] {
-    flex: 2;
+    flex: 1 1 120px;
+    min-width: 0;
     padding: 8px 12px;
     border: 1px solid #d0d0d0;
     border-radius: 6px;
     font-size: 0.95rem;
   }
   .child-row .dob-group {
-    flex: 3;
+    flex: 1 1 220px;
     display: flex;
     gap: 6px;
     align-items: center;
@@ -68,6 +70,7 @@
   .child-row .dob-group label { font-size: 0.85rem; color: #555; white-space: nowrap; }
   .child-row .dob-group input[type="date"] {
     flex: 1;
+    min-width: 0;
     padding: 8px 10px;
     border: 1px solid #d0d0d0;
     border-radius: 6px;
@@ -174,6 +177,18 @@
     color: #bbb;
     font-size: 1.2rem;
     padding-top: 24px;
+  }
+  /* Below this width, session-slots stack instead of sitting side by side
+     (min-width: 220px * 2 + gap no longer fits) — force the divider onto
+     its own centered row and point it down instead of right. */
+  @media (max-width: 600px) {
+    .group-divider {
+      flex-basis: 100%;
+      justify-content: center;
+      padding-top: 0;
+      margin: -4px 0;
+      transform: rotate(90deg);
+    }
   }
 
   /* Single session card (partial) */

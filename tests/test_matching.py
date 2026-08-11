@@ -1,6 +1,6 @@
 from datetime import date
 
-from scraper.normalize import load_fixture
+from scraper.normalize import Session, load_fixture
 from backend.matching import (
     Registrant, SearchPreferences, find_matches, eligible_sessions_for,
     age_in_months, matches_category_pref,
@@ -72,6 +72,48 @@ def test_age_at_session_start_excludes_child_still_too_young():
     just_under = Registrant(label="Just Under", birth_date=date(2025, 9, 10))
     eligible_ids = {s.session_id for s in eligible_sessions_for(just_under, sessions, prefs, TODAY)}
     assert "1001" not in eligible_ids
+
+
+# ── open-ended age bounds ───────────────────────────────────────────────────
+# ActiveNet lists some activities as e.g. "11+" with no upper cap. A missing
+# bound means unbounded on that side, not "invalid -> exclude".
+
+def _make_session(session_id, min_age_months, max_age_months, session_start_date="2026-09-08"):
+    return Session(
+        session_id=session_id,
+        activity_name="Test Activity",
+        category="Test",
+        facility_id="fac-01",
+        facility_name="Test Facility",
+        min_age_months=min_age_months,
+        max_age_months=max_age_months,
+        days_of_week=["Tue"],
+        start_time="09:00",
+        end_time="09:30",
+        session_start_date=session_start_date,
+        session_end_date=session_start_date,
+        status="open",
+        spots_available=5,
+        price=10.0,
+        registration_url="https://example.com",
+    )
+
+
+def test_missing_max_age_treated_as_unbounded():
+    session = _make_session("open-ended-max", min_age_months=132, max_age_months=None)
+    adult = Registrant(label="Adult", birth_date=date(1990, 1, 1))
+    assert eligible_sessions_for(adult, [session], SearchPreferences(), TODAY) == [session]
+
+
+def test_missing_min_age_treated_as_unbounded():
+    session = _make_session("open-ended-min", min_age_months=None, max_age_months=999)
+    assert eligible_sessions_for(TODDLER, [session], SearchPreferences(), TODAY) == [session]
+
+
+def test_missing_max_age_still_excludes_too_young_registrant():
+    """Unbounded above doesn't mean unbounded below -- min_age_months still applies."""
+    session = _make_session("open-ended-max-still-has-min", min_age_months=132, max_age_months=None)
+    assert eligible_sessions_for(TODDLER, [session], SearchPreferences(), TODAY) == []
 
 
 # ── matching tier tests ─────────────────────────────────────────────────────
