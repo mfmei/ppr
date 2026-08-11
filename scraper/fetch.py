@@ -76,6 +76,10 @@ def _request_headers() -> dict:
     raw_cookie = os.environ.get("ACTIVENET_COOKIE", "").strip()
     if raw_cookie:
         stable = _stable_cookies(raw_cookie)
+        print(
+            f"  ACTIVENET_COOKIE present ({len(raw_cookie)} chars raw); "
+            f"stable subset kept: {stable!r}"
+        )
         if stable:
             headers["Cookie"] = stable
     return headers
@@ -132,6 +136,11 @@ def fetch_sessions(min_age_months: int, max_age_months: int) -> dict:
         for i in new_items:
             seen_ids.add(i["id"])
         all_items.extend(new_items)
+
+        print(
+            f"  page {page}/{total_pages}: {len(items)} items "
+            f"({len(new_items)} new), total_records={page_info.get('total_records')}"
+        )
 
         if page >= total_pages:
             break
