@@ -4,11 +4,18 @@ Fetches activity listings from the Portland Parks & Rec ActiveNet backend.
 Endpoint and request shape captured from DevTools (Network > Fetch/XHR) while
 browsing https://anc.apm.activecommunities.com/portlandparks/activity/landing.
 
-WITHOUT auth cookies the API ignores current_page and always returns the same
-first ~20 activities. WITH cookies (copied from a logged-in browser session)
-full pagination works and you get the complete catalog.
+WITHOUT auth cookies the API ignores current_page entirely and always returns
+the same first ~20 activities. WITH cookies (copied from a logged-in browser
+session), current_page is respected in principle, but in practice the
+server's pagination is still erratic -- confirmed via logging that ~90% of
+page requests return the same first page's content regardless of which page
+was requested, cycling through a handful of "lucky" pages seemingly at
+random. fetch_sessions() compensates by re-sweeping all declared pages
+several times (see _SWEEP_ATTEMPTS) and merging newly-seen items across
+attempts, which in practice surfaces more of the catalog than any single
+sweep -- but there's no guarantee of ever seeing 100% of it.
 
-To enable full pagination:
+To enable cookie-authenticated fetching:
   1. Open https://anc.apm.activecommunities.com/portlandparks/activity/search
      in Chrome (no login required — just visiting the page sets the session).
   2. DevTools → Network tab → filter to Fetch/XHR → trigger any search.
@@ -28,10 +35,9 @@ import os
 import requests
 
 _BASE = "https://anc.apm.activecommunities.com/portlandparks"
-# The server's pagination is erratic -- most page requests just return the
-# same first page regardless of current_page. A bigger page size means fewer
-# total pages are needed, so each "lucky" hit covers more of the catalog.
-_PAGE_SIZE = 100
+# The server ignores total_records_per_page (confirmed: requesting 100 still
+# returns 20-item pages), so this can't be used to reduce the page count.
+_PAGE_SIZE = 20
 
 # Full search pattern the real browser sends. activity_select_param=2 is
 # required — without it the server ignores current_page and always returns
@@ -88,32 +94,23 @@ def _request_headers() -> dict:
     return headers
 
 
-def fetch_sessions(min_age_months: int, max_age_months: int) -> dict:
-    """Fetch activity_items by sweeping all server pages.
+# How many times to re-sweep all declared pages. The server's pagination is
+# erratic -- confirmed via logging that ~90% of page requests just return
+# the same first page's content regardless of which page was requested.
+# Repeating the full sweep with a fresh session each time lands on different
+# "lucky" pages, so merging dedup'd results across attempts improves
+# coverage where a single sweep only surfaces a small, effectively random
+# subset of the catalog.
+_SWEEP_ATTEMPTS = 5
 
-    The ActiveNet API requires activity_select_param=2 to respect current_page.
-    Even so, the server's internal pagination is stateful and erratic — it
-    cycles through different internal pages across successive requests in the
-    same session, so sweeping all declared pages surfaces most unique buckets.
-    Dedup by ID ensures no duplicates in the output.
 
-    min_age_months / max_age_months are passed as-is to narrow the server-side
-    result set; client-side filtering in matching.py is the authoritative filter.
-    """
-    headers = _request_headers()
-    search_pattern = {
-        **_BASE_SEARCH_PATTERN,
-        "min_age": min_age_months if min_age_months else None,
-        "max_age": max_age_months if max_age_months else None,
-    }
-
-    all_items: list[dict] = []
-    seen_ids: set = set()
-    total_pages: int | None = None
+def _sweep_once(headers: dict, search_pattern: dict, seen_ids: set, all_items: list[dict]) -> None:
+    """One pass through all declared pages, merging newly-seen items into all_items."""
     session = requests.Session()
     session.headers.update(headers)
 
     page = 1
+    total_pages = 1
     while True:
         resp = session.post(
             f"{_BASE}/rest/activities/list",
@@ -131,7 +128,7 @@ def fetch_sessions(min_age_months: int, max_age_months: int) -> dict:
         data = resp.json()
 
         page_info = data.get("headers", {}).get("page_info", {})
-        if total_pages is None:
+        if page == 1:
             total_pages = page_info.get("total_page", 1)
 
         items = data.get("body", {}).get("activity_items", [])
@@ -140,13 +137,35 @@ def fetch_sessions(min_age_months: int, max_age_months: int) -> dict:
             seen_ids.add(i["id"])
         all_items.extend(new_items)
 
-        print(
-            f"  page {page}/{total_pages}: {len(items)} items "
-            f"({len(new_items)} new), total_records={page_info.get('total_records')}"
-        )
+        if new_items:
+            print(f"    page {page}/{total_pages}: {len(new_items)} new items")
 
         if page >= total_pages:
             break
         page += 1
+
+
+def fetch_sessions(min_age_months: int, max_age_months: int) -> dict:
+    """Fetch activity_items by sweeping all server pages, several times over.
+
+    The ActiveNet API requires activity_select_param=2 to respect current_page
+    at all. min_age_months / max_age_months are passed as-is to narrow the
+    server-side result set; client-side filtering in matching.py is the
+    authoritative filter.
+    """
+    headers = _request_headers()
+    search_pattern = {
+        **_BASE_SEARCH_PATTERN,
+        "min_age": min_age_months if min_age_months else None,
+        "max_age": max_age_months if max_age_months else None,
+    }
+
+    all_items: list[dict] = []
+    seen_ids: set = set()
+
+    for attempt in range(1, _SWEEP_ATTEMPTS + 1):
+        before = len(all_items)
+        _sweep_once(headers, search_pattern, seen_ids, all_items)
+        print(f"  sweep {attempt}/{_SWEEP_ATTEMPTS}: {len(all_items) - before} new (total {len(all_items)})")
 
     return {"body": {"activity_items": all_items}}
