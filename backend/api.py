@@ -116,7 +116,12 @@ def search(req: SearchRequest):
 
     results = find_matches(registrants, sessions, prefs, today=today)
     if facility_distances:
-        results.sort(key=_result_distance)
+        # find_matches already orders by tier (all-kids matches before
+        # individual ones) -- sort within each tier by distance rather
+        # than across the whole list, or a far-away simultaneous match
+        # could reorder above a nearby one, but never past a tier boundary.
+        _TIER_ORDER = {"simultaneous": 0, "back_to_back": 1, "partial": 2}
+        results.sort(key=lambda r: (_TIER_ORDER.get(r.tier, 99), _result_distance(r)))
 
     full_raw = {
         r.label: full_sessions_for(r, sessions, prefs, today) for r in registrants

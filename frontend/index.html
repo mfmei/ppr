@@ -677,7 +677,7 @@ const TIER_META = {
   partial: {
     label: 'Individual matches',
     cls: 'partial',
-    desc: 'No shared slot found — showing the best options per child.',
+    desc: 'Every other eligible class for each child on its own.',
   },
 };
 
@@ -689,32 +689,45 @@ function renderResults(data) {
     return;
   }
 
-  const tier = data.tier;
-  const meta = TIER_META[tier] || { label: tier, cls: 'partial', desc: '' };
-  const isGroup = tier === 'simultaneous' || tier === 'back_to_back';
   const multiChild = Object.keys(data.full_sessions || {}).length > 1;
 
-  let html = `
-    <div class="tier-header">
-      <span class="tier-badge ${meta.cls}">${meta.label}</span>
-      <span class="tier-desc">${meta.desc}</span>
-    </div>
-    <div class="results-count">${data.results.length} result${data.results.length !== 1 ? 's' : ''}</div>
-  `;
-
+  // Results arrive grouped by tier already (all-kids matches first), but
+  // group explicitly here too so each tier gets its own header/count --
+  // a search can surface more than one tier at once (e.g. a couple of
+  // shared-slot combos *and* every other individually-eligible session).
+  const groups = new Map();
   for (const result of data.results) {
-    const entries = Object.entries(result.sessions); // [[label, session], ...]
+    if (!groups.has(result.tier)) groups.set(result.tier, []);
+    groups.get(result.tier).push(result);
+  }
 
-    if (isGroup && entries.length > 1) {
-      let inner = '';
-      entries.forEach(([label, session], i) => {
-        if (i > 0) inner += '<div class="group-divider">→</div>';
-        inner += `<div class="session-slot">${sessionSlotHTML(label, session)}</div>`;
-      });
-      html += `<div class="group-card">${inner}</div>`;
-    } else {
-      const [label, session] = entries[0];
-      html += `<div class="session-card">${sessionSlotHTML(multiChild ? label : '', session)}</div>`;
+  let html = '';
+  for (const [tier, group] of groups) {
+    const meta = TIER_META[tier] || { label: tier, cls: 'partial', desc: '' };
+    const isGroup = tier === 'simultaneous' || tier === 'back_to_back';
+
+    html += `
+      <div class="tier-header">
+        <span class="tier-badge ${meta.cls}">${meta.label}</span>
+        <span class="tier-desc">${meta.desc}</span>
+      </div>
+      <div class="results-count">${group.length} result${group.length !== 1 ? 's' : ''}</div>
+    `;
+
+    for (const result of group) {
+      const entries = Object.entries(result.sessions); // [[label, session], ...]
+
+      if (isGroup && entries.length > 1) {
+        let inner = '';
+        entries.forEach(([label, session], i) => {
+          if (i > 0) inner += '<div class="group-divider">→</div>';
+          inner += `<div class="session-slot">${sessionSlotHTML(label, session)}</div>`;
+        });
+        html += `<div class="group-card">${inner}</div>`;
+      } else {
+        const [label, session] = entries[0];
+        html += `<div class="session-card">${sessionSlotHTML(multiChild ? label : '', session)}</div>`;
+      }
     }
   }
 

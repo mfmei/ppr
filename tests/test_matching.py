@@ -137,6 +137,32 @@ def test_two_kids_simultaneous_match_found():
     assert results[0].sessions_by_registrant["Preschooler"].session_id == "1002"
 
 
+def test_shared_slot_does_not_hide_other_individually_eligible_sessions():
+    """A single all-kids simultaneous match must not suppress a child's
+    other individually-eligible sessions -- regression test for a bug
+    where find_matches returned only the best tier, so e.g. a preschooler
+    with 19 real eligible classes would only see the 1 that happened to
+    also line up with a sibling's schedule."""
+    shared = _make_session("shared", min_age_months=0, max_age_months=999)
+    preschooler_only_a = _make_session(
+        "preschooler-only-a", min_age_months=36, max_age_months=60, session_start_date="2026-09-09"
+    )
+    preschooler_only_b = _make_session(
+        "preschooler-only-b", min_age_months=36, max_age_months=60, session_start_date="2026-09-10"
+    )
+    sessions = [shared, preschooler_only_a, preschooler_only_b]
+
+    results = find_matches([TODDLER, PRESCHOOLER], sessions, SearchPreferences(), today=TODAY)
+
+    assert any(r.tier == "simultaneous" for r in results)
+    preschooler_session_ids = {
+        r.sessions_by_registrant["Preschooler"].session_id
+        for r in results
+        if "Preschooler" in r.sessions_by_registrant
+    }
+    assert preschooler_session_ids == {"shared", "preschooler-only-a", "preschooler-only-b"}
+
+
 def test_no_shared_slot_falls_back_to_partial():
     """A toddler and a school-age kid have no combined facility/time overlap."""
     _facilities, sessions = load_fixture(FIXTURE_PATH)

@@ -1,14 +1,18 @@
 """
 Core filtering + tiered multi-child matching logic.
 
-Tiers for a multi-child search, in priority order:
+Tiers for a multi-child search, surfaced together in priority order (never
+one instead of another -- an option that's great for one child shouldn't
+be hidden just because a different, unrelated option also covers every
+child):
   1. SIMULTANEOUS — one session per child, same facility, overlapping time,
      on a shared date.
   2. BACK_TO_BACK — one session per child, same facility, sequential in
      time with a gap small enough to be realistic (default: <= 30 min).
-  3. PARTIAL — no combination covers every child; fall back to each
-     child's individually eligible sessions, labeled with which child(ren)
-     they're for.
+  3. PARTIAL — every child's individually eligible sessions, labeled with
+     which child they're for. Always included, even when tier 1 or 2 also
+     found matches, so a session that only works for one child is never
+     dropped from the results.
 """
 from __future__ import annotations
 
@@ -233,14 +237,12 @@ def find_matches(
                 )
             )
 
-    if simultaneous:
-        return simultaneous
-    if back_to_back:
-        return back_to_back
-
-    # Tier 3: partial — per-child eligible sessions, labeled individually.
+    # Tier 3: every individually-eligible session, per child. Always
+    # included alongside tiers 1/2 above -- a shared-slot combo is a nice
+    # convenience, not a reason to hide the rest of a child's options.
     partial = []
     for label, sessions_for_reg in per_registrant_eligible.items():
         for s in sessions_for_reg:
             partial.append(MatchResult(tier="partial", sessions_by_registrant={label: s}))
-    return partial
+
+    return simultaneous + back_to_back + partial
