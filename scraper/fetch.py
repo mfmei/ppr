@@ -2,47 +2,29 @@
 Fetches activity listings from the Portland Parks & Rec ActiveNet backend.
 
 Endpoint and request shape captured from DevTools (Network > Fetch/XHR) while
-browsing https://anc.apm.activecommunities.com/portlandparks/activity/landing.
+browsing https://anc.apm.activecommunities.com/portlandparks/activity/landing,
+then confirmed against the site's own JS bundle (app.index.*.js): pagination
+is NOT part of the JSON body. The client library (createAPI/httpClient in the
+bundle) takes the `page_info` object callers pass and moves it onto the
+request as an HTTP header named "page_info", JSON-stringified -- e.g.
+    page_info: {"page_number":2,"total_records_per_page":20}
+A `pagination_info` (or any other) field inside the JSON body is silently
+ignored by the server, which is why earlier attempts that put pagination
+there always got page 1 back regardless of what was requested.
 
-WITHOUT auth cookies the API ignores current_page entirely and always returns
-the same first ~20 activities. WITH cookies (copied from a logged-in browser
-session), current_page is respected in principle, but in practice the
-server's pagination is still erratic -- confirmed via logging that ~90% of
-page requests return the same first page's content regardless of which page
-was requested, cycling through a handful of "lucky" pages seemingly at
-random. fetch_sessions() compensates by re-sweeping all declared pages
-several times (see _SWEEP_ATTEMPTS) and merging newly-seen items across
-attempts, which in practice surfaces more of the catalog than any single
-sweep -- but there's no guarantee of ever seeing 100% of it.
-
-To enable cookie-authenticated fetching:
-  1. Open https://anc.apm.activecommunities.com/portlandparks/activity/search
-     in Chrome (no login required — just visiting the page sets the session).
-  2. DevTools → Network tab → filter to Fetch/XHR → trigger any search.
-  3. Click the POST request to .../rest/activities/list → Headers tab.
-  4. Copy the full value of the "cookie:" request header.
-  5. Set it as an environment variable before running the ingest:
-       export ACTIVENET_COOKIE='<paste here>'
-       python3 -m scraper.ingest
-
-The server-side age filter (min_age/max_age) is in months but returns loose
-overlapping matches rather than strict containment; client-side filtering in
-matching.py is the authoritative filter.
+With page_info sent correctly as a header, current_page is respected exactly
+and requires no authentication at all -- a plain anonymous session (just
+GET the search page first to pick up cookies, then POST) pages through the
+full catalog deterministically.
 
 Real captured response shape: scraper/fixtures/real_api_sample.json
 """
-import os
 import requests
 
 _BASE = "https://anc.apm.activecommunities.com/portlandparks"
-# The server ignores total_records_per_page (confirmed: requesting 100 still
-# returns 20-item pages), so this can't be used to reduce the page count.
 _PAGE_SIZE = 20
 
-# Full search pattern the real browser sends. activity_select_param=2 is
-# required — without it the server ignores current_page and always returns
-# the same first batch.
-_BASE_SEARCH_PATTERN = {
+_SEARCH_PATTERN = {
     "skills": [], "time_after_str": "", "days_of_week": None,
     "activity_select_param": 2, "center_ids": [], "time_before_str": "",
     "open_spots": None, "activity_id": None, "activity_category_ids": [],
@@ -55,72 +37,50 @@ _BASE_SEARCH_PATTERN = {
 }
 
 
-_STABLE_COOKIE_KEYS = {"NEED_VERIFY_RECAPTCHA", "portlandparks_FullPageView", "portlandparks_locale"}
+def _page_info_header(page: int) -> dict:
+    import json
+    return {
+        "page_info": json.dumps({
+            "page_number": page,
+            "total_records_per_page": _PAGE_SIZE,
+            "order_by": "Name",
+            "order_option": "ASC",
+        })
+    }
 
 
-def _stable_cookies(raw: str) -> str:
-    """Strip session/load-balancer cookies from a browser cookie string.
+def fetch_sessions(min_age_months: int, max_age_months: int) -> dict:
+    """Fetch all activity_items by paging through the full catalog.
 
-    Keeping only stable preference cookies lets the server start a fresh
-    pagination session rather than restoring stale state from the browser.
-    The requests.Session will collect the new session cookies automatically
-    as they arrive in response headers.
+    min_age_months / max_age_months are passed as-is to narrow the
+    server-side result set; client-side filtering in matching.py is the
+    authoritative filter.
     """
-    parts = []
-    for chunk in raw.split(";"):
-        chunk = chunk.strip()
-        key = chunk.split("=", 1)[0].strip()
-        if key in _STABLE_COOKIE_KEYS:
-            parts.append(chunk)
-    return "; ".join(parts)
-
-
-def _request_headers() -> dict:
-    headers = {
+    session = requests.Session()
+    session.headers.update({
         "Content-Type": "application/json",
         "Accept": "application/json",
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
         "Referer": f"{_BASE}/activity/search",
+    })
+    session.get(f"{_BASE}/activity/search", timeout=10)
+
+    search_pattern = {
+        **_SEARCH_PATTERN,
+        "min_age": min_age_months if min_age_months else None,
+        "max_age": max_age_months if max_age_months else None,
     }
-    raw_cookie = os.environ.get("ACTIVENET_COOKIE", "").strip()
-    if raw_cookie:
-        stable = _stable_cookies(raw_cookie)
-        print(
-            f"  ACTIVENET_COOKIE present ({len(raw_cookie)} chars raw); "
-            f"stable subset kept: {stable!r}"
-        )
-        if stable:
-            headers["Cookie"] = stable
-    return headers
 
-
-# How many times to re-sweep all declared pages. The server's pagination is
-# erratic -- confirmed via logging that ~90% of page requests just return
-# the same first page's content regardless of which page was requested.
-# Repeating the full sweep with a fresh session each time lands on different
-# "lucky" pages, so merging dedup'd results across attempts improves
-# coverage where a single sweep only surfaces a small, effectively random
-# subset of the catalog.
-_SWEEP_ATTEMPTS = 5
-
-
-def _sweep_once(headers: dict, search_pattern: dict, seen_ids: set, all_items: list[dict]) -> None:
-    """One pass through all declared pages, merging newly-seen items into all_items."""
-    session = requests.Session()
-    session.headers.update(headers)
-
+    all_items: list[dict] = []
     page = 1
     total_pages = 1
-    while True:
+    while page <= total_pages:
         resp = session.post(
-            f"{_BASE}/rest/activities/list",
+            f"{_BASE}/rest/activities/list?locale=en-US",
+            headers=_page_info_header(page),
             json={
                 "activity_search_pattern": search_pattern,
                 "activity_transfer_pattern": {},
-                "pagination_info": {
-                    "current_page": page,
-                    "total_records_per_page": _PAGE_SIZE,
-                },
             },
             timeout=10,
         )
@@ -130,42 +90,12 @@ def _sweep_once(headers: dict, search_pattern: dict, seen_ids: set, all_items: l
         page_info = data.get("headers", {}).get("page_info", {})
         if page == 1:
             total_pages = page_info.get("total_page", 1)
+            print(f"  {page_info.get('total_records', '?')} total records across {total_pages} pages")
 
         items = data.get("body", {}).get("activity_items", [])
-        new_items = [i for i in items if i["id"] not in seen_ids]
-        for i in new_items:
-            seen_ids.add(i["id"])
-        all_items.extend(new_items)
+        all_items.extend(items)
+        print(f"    page {page}/{total_pages}: {len(items)} items")
 
-        if new_items:
-            print(f"    page {page}/{total_pages}: {len(new_items)} new items")
-
-        if page >= total_pages:
-            break
         page += 1
-
-
-def fetch_sessions(min_age_months: int, max_age_months: int) -> dict:
-    """Fetch activity_items by sweeping all server pages, several times over.
-
-    The ActiveNet API requires activity_select_param=2 to respect current_page
-    at all. min_age_months / max_age_months are passed as-is to narrow the
-    server-side result set; client-side filtering in matching.py is the
-    authoritative filter.
-    """
-    headers = _request_headers()
-    search_pattern = {
-        **_BASE_SEARCH_PATTERN,
-        "min_age": min_age_months if min_age_months else None,
-        "max_age": max_age_months if max_age_months else None,
-    }
-
-    all_items: list[dict] = []
-    seen_ids: set = set()
-
-    for attempt in range(1, _SWEEP_ATTEMPTS + 1):
-        before = len(all_items)
-        _sweep_once(headers, search_pattern, seen_ids, all_items)
-        print(f"  sweep {attempt}/{_SWEEP_ATTEMPTS}: {len(all_items) - before} new (total {len(all_items)})")
 
     return {"body": {"activity_items": all_items}}

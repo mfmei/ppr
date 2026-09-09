@@ -49,8 +49,14 @@ def _normalize_time_token(token: str) -> str:
 
 
 def _parse_time_range(time_range: str) -> tuple[str, str]:
-    """Parse "9:00 AM - 9:30 AM" or "Noon - 12:45 PM" -> ("09:00", "09:30")."""
+    """Parse "9:00 AM - 9:30 AM" or "Noon - 12:45 PM" -> ("09:00", "09:30").
+
+    Overnight activities render as "6:00 PM - 4:00 PM on the next day" --
+    the day-crossing isn't tracked in our schema, so the suffix is dropped
+    and only the end clock time is kept.
+    """
     start_raw, end_raw = time_range.split(" - ", 1)
+    end_raw = end_raw.replace(" on the next day", "")
     start = datetime.strptime(_normalize_time_token(start_raw), "%I:%M %p")
     end = datetime.strptime(_normalize_time_token(end_raw), "%I:%M %p")
     return start.strftime("%H:%M"), end.strftime("%H:%M")

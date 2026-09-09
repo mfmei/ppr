@@ -27,8 +27,6 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Scrape and rebuild sessions.db
-        env:
-          ACTIVENET_COOKIE: ${{ secrets.ACTIVENET_COOKIE }}
         run: python -m scraper.ingest
 
       - name: Commit updated sessions.db

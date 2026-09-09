@@ -28,10 +28,6 @@ def _init_db(conn: sqlite3.Connection) -> None:
 
 
 def ingest() -> None:
-    import os
-    if not os.environ.get("ACTIVENET_COOKIE"):
-        print("⚠  ACTIVENET_COOKIE not set — will only retrieve ~20 activities.")
-        print("   See scraper/fetch.py for instructions to get the full catalog.")
     print("Fetching sessions from ActiveNet...")
     raw = fetch_sessions(_FETCH_MIN_AGE_MONTHS, _FETCH_MAX_AGE_MONTHS)
     facilities, sessions = normalize_response(raw)
