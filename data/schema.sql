@@ -4,11 +4,16 @@
 -- All times are local (Portland) — no timezone handling needed.
 
 CREATE TABLE IF NOT EXISTS facilities (
-    facility_id     TEXT PRIMARY KEY,   -- ID as given by ActiveNet, not invented
-    name            TEXT NOT NULL,
-    address         TEXT,               -- raw address string from source
-    lat             REAL,               -- nullable; populated later for distance sort
-    lon             REAL
+    facility_id           TEXT PRIMARY KEY,   -- ID as given by ActiveNet, not invented
+    name                  TEXT NOT NULL,
+    address               TEXT,               -- raw address string from source
+    lat                   REAL,               -- nullable; populated later for distance sort
+    lon                   REAL,
+    geocode_attempted_at  TEXT                -- set after any geocode attempt (success or
+                                               -- failure) so a permanently-ungeocodable
+                                               -- facility (e.g. a trailhead described in
+                                               -- free text, not an address) isn't retried
+                                               -- against Nominatim on every ingest run
 );
 
 CREATE TABLE IF NOT EXISTS sessions (

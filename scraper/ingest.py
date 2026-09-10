@@ -10,6 +10,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
+from scraper import geocode
 from scraper.fetch import fetch_sessions
 from scraper.normalize import normalize_response
 
@@ -24,6 +25,10 @@ _FETCH_MAX_AGE_MONTHS = 0
 
 def _init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA_PATH.read_text())
+    try:
+        conn.execute("ALTER TABLE facilities ADD COLUMN geocode_attempted_at TEXT")
+    except sqlite3.OperationalError:
+        pass  # already migrated
     conn.commit()
 
 
@@ -90,6 +95,12 @@ def ingest() -> None:
     conn.commit()
     conn.close()
     print(f"Done. DB written to {DB_PATH}")
+
+    # New facilities land with lat/lon NULL (normalize.py doesn't geocode);
+    # backfill them here so "sort by distance" never silently goes stale --
+    # a facility that's already geocoded is skipped, so this is a no-op
+    # on most runs and only rate-limits (1 req/sec) for newly-seen ones.
+    geocode.run()
 
 
 if __name__ == "__main__":

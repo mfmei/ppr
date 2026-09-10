@@ -9,6 +9,7 @@ Run from the project root:
 """
 import sqlite3
 import time
+from datetime import datetime, timezone
 import requests
 from pathlib import Path
 
@@ -87,12 +88,18 @@ def geocode_query(query: str):
 
 def run():
     conn = sqlite3.connect(DB_PATH)
+    # geocode_attempted_at gates retries -- a facility whose name is a
+    # driving-directions paragraph rather than an address (a handful of
+    # nature-walk meeting points) will never resolve via Nominatim, so
+    # without this every ingest run would re-attempt (and re-fail) the
+    # same handful forever, one HTTP round trip each at 1 req/sec.
     facilities = conn.execute(
-        "SELECT facility_id, name FROM facilities WHERE lat IS NULL"
+        "SELECT facility_id, name FROM facilities "
+        "WHERE lat IS NULL AND geocode_attempted_at IS NULL"
     ).fetchall()
 
     if not facilities:
-        print("All facilities already geocoded.")
+        print("All facilities already geocoded (or previously attempted).")
         conn.close()
         return
 
@@ -102,16 +109,22 @@ def run():
         query = _KNOWN_ADDRESSES.get(name) or _search_query(name)
         print(f"  {name!r}\n    → {query!r} … ", end="", flush=True)
         result = geocode_query(query)
+        attempted_at = datetime.now(timezone.utc).isoformat()
         if result:
             lat, lon = result
             conn.execute(
-                "UPDATE facilities SET lat=?, lon=? WHERE facility_id=?",
-                (lat, lon, fid),
+                "UPDATE facilities SET lat=?, lon=?, geocode_attempted_at=? WHERE facility_id=?",
+                (lat, lon, attempted_at, fid),
             )
             conn.commit()
             print(f"({lat:.4f}, {lon:.4f})")
             found += 1
         else:
+            conn.execute(
+                "UPDATE facilities SET geocode_attempted_at=? WHERE facility_id=?",
+                (attempted_at, fid),
+            )
+            conn.commit()
             print("not found")
         time.sleep(1.1)
 
