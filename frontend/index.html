@@ -233,6 +233,11 @@
   .meta-spots::before { content: '✓ '; }
   .meta-price::before { content: '$ '; }
 
+  /* Spots-remaining %: >=50% green, 20-49% yellow, <20% red */
+  .meta-spots.spots-green  { color: #1a7f37; font-weight: 600; }
+  .meta-spots.spots-yellow { color: #9a6700; font-weight: 600; }
+  .meta-spots.spots-red    { color: #cf222e; font-weight: 600; }
+
   .register-btn {
     display: inline-block;
     padding: 7px 16px;
@@ -636,11 +641,20 @@ function fmtAge(min, max) {
 
 // ── Session card HTML ───────────────────────────────────────────────────────
 
+function spotsColorClass(spotsAvailable, totalSpots) {
+  if (spotsAvailable == null || !totalSpots) return '';
+  const pct = spotsAvailable / totalSpots;
+  if (pct >= 0.5) return 'spots-green';
+  if (pct >= 0.2) return 'spots-yellow';
+  return 'spots-red';
+}
+
 function sessionSlotHTML(childLabel, session) {
   const days  = fmtDays(session.days_of_week);
   const time  = `${fmt24to12(session.start_time)} – ${fmt24to12(session.end_time)}`;
   const dates = fmtDateRange(session.session_start_date, session.session_end_date);
   const spots = session.spots_available != null ? `${session.spots_available} spot${session.spots_available !== 1 ? 's' : ''} left` : '';
+  const spotsCls = spotsColorClass(session.spots_available, session.total_spots);
   const price = session.price != null ? `$${Math.round(session.price)}` : '';
   const facility = session.facility_name || session.facility_id.replace(/_/g, ' ');
   const regUrl = session.registration_url;
@@ -654,7 +668,7 @@ function sessionSlotHTML(childLabel, session) {
       <span class="meta-days">${days}</span>
       <span class="meta-time">${time}</span>
       ${dates ? `<span class="meta-dates">${dates}</span>` : ''}
-      ${spots ? `<span class="meta-spots">${spots}</span>` : ''}
+      ${spots ? `<span class="meta-spots ${spotsCls}">${spots}</span>` : ''}
       ${price ? `<span class="meta-price">${price}</span>` : ''}
     </div>
     ${regUrl ? `<a class="register-btn" href="${regUrl}" target="_blank" rel="noopener">Register ↗</a>` : ''}

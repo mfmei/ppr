@@ -47,6 +47,7 @@ def load_sessions() -> list[Session]:
             session_end_date=row["session_end_date"],
             status=row["status"],
             spots_available=row["spots_available"],
+            total_spots=row["total_spots"],
             price=row["price"],
             registration_url=row["registration_url"],
         )

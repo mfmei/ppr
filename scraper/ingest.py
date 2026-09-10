@@ -29,6 +29,10 @@ def _init_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE facilities ADD COLUMN geocode_attempted_at TEXT")
     except sqlite3.OperationalError:
         pass  # already migrated
+    try:
+        conn.execute("ALTER TABLE sessions ADD COLUMN total_spots INTEGER")
+    except sqlite3.OperationalError:
+        pass  # already migrated
     conn.commit()
 
 
@@ -64,8 +68,8 @@ def ingest() -> None:
                 min_age_months, max_age_months,
                 days_of_week, start_time, end_time,
                 session_start_date, session_end_date,
-                status, spots_available, price, registration_url, last_scraped_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                status, spots_available, total_spots, price, registration_url, last_scraped_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(session_id) DO UPDATE SET
                 activity_name=excluded.activity_name,
                 category=excluded.category,
@@ -79,6 +83,7 @@ def ingest() -> None:
                 session_end_date=excluded.session_end_date,
                 status=excluded.status,
                 spots_available=excluded.spots_available,
+                total_spots=excluded.total_spots,
                 price=excluded.price,
                 registration_url=excluded.registration_url,
                 last_scraped_at=excluded.last_scraped_at
@@ -88,7 +93,7 @@ def ingest() -> None:
                 s.min_age_months, s.max_age_months,
                 json.dumps(s.days_of_week), s.start_time, s.end_time,
                 s.session_start_date, s.session_end_date,
-                s.status, s.spots_available, s.price, s.registration_url, now,
+                s.status, s.spots_available, s.total_spots, s.price, s.registration_url, now,
             ),
         )
 

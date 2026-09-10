@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 
     status              TEXT NOT NULL,  -- 'open' | 'full' | 'closed'
     spots_available     INTEGER,        -- nullable, if source provides it
+    total_spots         INTEGER,        -- class capacity, for a spots-remaining %
     price               REAL,
 
     registration_url    TEXT,
