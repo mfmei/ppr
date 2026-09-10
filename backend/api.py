@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import date
+from datetime import date, datetime
 from math import atan2, cos, radians, sin, sqrt
 from pathlib import Path
 from typing import Optional
@@ -47,6 +47,19 @@ def _geocode(address: str) -> Optional[tuple[float, float]]:
     return None
 
 
+def _is_enrollable(enrollment_opens_at: Optional[str], now: datetime) -> bool:
+    """ActiveNet lists a class before its registration window opens -- the
+    real site swaps the enroll button for "Enrollment opens <date>" text
+    until then. enrollment_opens_at is None for anything already open."""
+    if not enrollment_opens_at:
+        return True
+    try:
+        opens_at = datetime.strptime(enrollment_opens_at, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return True
+    return now >= opens_at
+
+
 def _haversine_miles(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 3958.8
     dlat = radians(lat2 - lat1)
@@ -85,6 +98,7 @@ def search(req: SearchRequest):
     ]
     prefs = SearchPreferences(day_pref=req.day_pref, time_pref=req.time_pref, categories=req.categories)
     today = date.today()
+    now = datetime.now()
 
     # Build facility → distance map if an address was provided.
     facility_distances: dict[str, float] = {}
@@ -108,20 +122,33 @@ def search(req: SearchRequest):
         fid = session_dict.get("facility_id")
         if fid and fid in facility_distances:
             session_dict["distance_miles"] = facility_distances[fid]
+        session_dict["is_enrollable"] = _is_enrollable(session_dict.get("enrollment_opens_at"), now)
         return session_dict
 
     def _result_distance(result) -> float:
         first_session = next(iter(result.sessions_by_registrant.values()))
         return facility_distances.get(first_session.facility_id, float("inf"))
 
+    def _result_enrollable(result) -> bool:
+        # A combo (simultaneous/back-to-back) needs every child's slot open
+        # for enrollment, not just one -- a parent can't act on half a combo.
+        return all(
+            _is_enrollable(s.enrollment_opens_at, now)
+            for s in result.sessions_by_registrant.values()
+        )
+
     results = find_matches(registrants, sessions, prefs, today=today)
-    if facility_distances:
-        # find_matches already orders by tier (all-kids matches before
-        # individual ones) -- sort within each tier by distance rather
-        # than across the whole list, or a far-away simultaneous match
-        # could reorder above a nearby one, but never past a tier boundary.
-        _TIER_ORDER = {"simultaneous": 0, "back_to_back": 1, "partial": 2}
-        results.sort(key=lambda r: (_TIER_ORDER.get(r.tier, 99), _result_distance(r)))
+    # find_matches already orders by tier (all-kids matches before individual
+    # ones); sort within each tier -- not-yet-enrollable classes (real
+    # "Enroll Now" button not clickable yet) pushed below ones open right
+    # now, and (when an address was given) nearer facilities before farther
+    # ones -- without ever crossing a tier boundary.
+    _TIER_ORDER = {"simultaneous": 0, "back_to_back": 1, "partial": 2}
+    results.sort(key=lambda r: (
+        _TIER_ORDER.get(r.tier, 99),
+        0 if _result_enrollable(r) else 1,
+        _result_distance(r) if facility_distances else 0,
+    ))
 
     full_raw = {
         r.label: full_sessions_for(r, sessions, prefs, today) for r in registrants

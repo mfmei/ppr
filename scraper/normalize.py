@@ -35,6 +35,7 @@ class Session:
     status: str            # "open" | "full"
     spots_available: Optional[int]
     total_spots: Optional[int]  # class capacity, for a spots-remaining % (e.g. color-coding)
+    enrollment_opens_at: Optional[str]  # "YYYY-MM-DD HH:MM:SS" local time; None = open now
     price: Optional[float]
     registration_url: Optional[str]
     facility_name: Optional[str] = None
@@ -178,6 +179,7 @@ def normalize_response(raw: dict) -> tuple[list[Facility], list[Session]]:
                 status=_derive_status(item.get("openings", "0")),
                 spots_available=int(item["openings"]) if str(item.get("openings", "")).isdigit() else None,
                 total_spots=item.get("total_open"),
+                enrollment_opens_at=item.get("activity_online_start_time") or None,
                 price=item.get("search_from_price"),
                 registration_url=item.get("detail_url"),
             )

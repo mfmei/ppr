@@ -95,6 +95,7 @@ def _make_session(session_id, min_age_months, max_age_months, session_start_date
         status="open",
         spots_available=5,
         total_spots=10,
+        enrollment_opens_at=None,
         price=10.0,
         registration_url="https://example.com",
     )
