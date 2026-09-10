@@ -101,6 +101,15 @@
   #add-child:hover { border-color: #2d6a2d; color: #2d6a2d; }
 
   .prefs-section { margin-bottom: 24px; }
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    color: #333;
+    cursor: pointer;
+  }
+  .checkbox-row input { width: 16px; height: 16px; cursor: pointer; }
   .prefs-row { display: flex; gap: 16px; flex-wrap: wrap; }
   .pref-group { display: flex; flex-direction: column; gap: 4px; }
   .pref-group label { font-size: 0.85rem; color: #555; }
@@ -391,6 +400,13 @@
         <div class="section-label">Children</div>
         <div id="registrants"></div>
         <button type="button" id="add-child">+ Add another child</button>
+      </div>
+
+      <div class="prefs-section">
+        <label class="checkbox-row">
+          <input type="checkbox" id="only-open-for-enrollment" checked>
+          Only show classes open for registration now
+        </label>
       </div>
 
       <div class="prefs-section">
@@ -822,6 +838,7 @@ document.getElementById('search-form').addEventListener('submit', async (e) => {
   const time_pref = document.getElementById('time-pref').value || null;
   const categories = [...categoryOptions.querySelectorAll('input:checked')].map(cb => cb.value);
   const address   = addrInput.value.trim() || null;
+  const only_open_for_enrollment = document.getElementById('only-open-for-enrollment').checked;
 
   const addrError = document.getElementById('address-error');
   addrError.style.display = 'none';
@@ -837,6 +854,7 @@ document.getElementById('search-form').addEventListener('submit', async (e) => {
       body: JSON.stringify({
         registrants, day_pref, time_pref, address,
         categories: categories.length ? categories : null,
+        only_open_for_enrollment,
         address_lat: addrCoords?.lat ?? null,
         address_lon: addrCoords?.lon ?? null,
       }),

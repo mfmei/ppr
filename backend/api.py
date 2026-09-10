@@ -78,6 +78,7 @@ class SearchRequest(BaseModel):
     day_pref: Optional[str] = None   # "weekday" | "weekend"
     time_pref: Optional[str] = None  # "morning" | "afternoon" | "evening"
     categories: Optional[list[str]] = None  # e.g. ["Aquatics", "Art"]; empty/omitted = any
+    only_open_for_enrollment: bool = False  # exclude classes whose "Enroll Now" isn't clickable yet
     address: Optional[str] = None
     address_lat: Optional[float] = None  # pre-resolved coords from autocomplete
     address_lon: Optional[float] = None
@@ -99,6 +100,9 @@ def search(req: SearchRequest):
     prefs = SearchPreferences(day_pref=req.day_pref, time_pref=req.time_pref, categories=req.categories)
     today = date.today()
     now = datetime.now()
+
+    if req.only_open_for_enrollment:
+        sessions = [s for s in sessions if _is_enrollable(s.enrollment_opens_at, now)]
 
     # Build facility → distance map if an address was provided.
     facility_distances: dict[str, float] = {}
