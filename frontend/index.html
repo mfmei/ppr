@@ -222,6 +222,12 @@
     font-weight: 600;
     margin-bottom: 2px;
   }
+  a.session-name-link {
+    display: inline-block;
+    color: #1a1a1a;
+    text-decoration: none;
+  }
+  a.session-name-link:hover { color: #2d6a2d; text-decoration: underline; }
   .session-facility {
     font-size: 0.88rem;
     color: #2d6a2d;
@@ -690,9 +696,13 @@ function sessionSlotHTML(childLabel, session) {
   const dist = session.distance_miles != null ? `${session.distance_miles} mi` : '';
   const notYetEnrollable = session.is_enrollable === false;
 
+  const titleHTML = (notYetEnrollable && regUrl)
+    ? `<a class="session-name session-name-link" href="${regUrl}" target="_blank" rel="noopener">${session.activity_name}</a>`
+    : `<div class="session-name">${session.activity_name}</div>`;
+
   return `
     ${childLabel ? `<div class="child-label">${childLabel}</div>` : ''}
-    <div class="session-name">${session.activity_name}</div>
+    ${titleHTML}
     <div class="session-facility">${facility}${dist ? ` <span class="meta-dist">${dist}</span>` : ''}</div>
     <div class="session-meta">
       <span class="meta-days">${days}</span>
