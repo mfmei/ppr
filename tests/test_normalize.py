@@ -25,6 +25,9 @@ def test_pool_name_prefixes_fold_into_aquatics():
         "Grant - Seal",
         "Ida B. Wells - Angelfish",
         "Peninsula - Polar Bear",
+        "MDCC - Otter",
+        "MSCC - Pre - Penguin",
+        "SWCC - Dolphin",
     ]:
         assert _derive_category(name) == "Aquatics"
 

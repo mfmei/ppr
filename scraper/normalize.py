@@ -88,13 +88,20 @@ _CATEGORY_ALIASES = {
     "Sewing": "Art",
     "Ballet": "Dance",
     "Creative Dance": "Dance",
-    # These activity names use the pool's name in place of a category
-    # (e.g. "Creston - Goldfish", "EPCC - Sea Lion" are swim lesson levels).
+    # These activity names use the pool's name (or, for pools housed inside
+    # a community center, the center's initials) in place of a category --
+    # e.g. "Creston - Goldfish", "EPCC - Sea Lion", "MDCC - Otter" are all
+    # swim lesson levels. Missing one here doesn't error, it just quietly
+    # strands that pool's classes under a one-off category no one filters
+    # by, so a plain "Aquatics" search silently excludes that whole pool.
     "Creston": "Aquatics",
-    "EPCC": "Aquatics",
+    "EPCC": "Aquatics",       # East Portland Community Center (pool)
     "Grant": "Aquatics",
     "Ida B. Wells": "Aquatics",
     "Peninsula": "Aquatics",
+    "MDCC": "Aquatics",       # Matt Dishman Community Center (pool)
+    "MSCC": "Aquatics",       # Mt Scott Community Center (pool)
+    "SWCC": "Aquatics",       # Southwest Community Center (pool)
 }
 
 # Raw ActiveNet category prefixes that aren't useful as a user-facing filter
