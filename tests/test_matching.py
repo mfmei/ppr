@@ -185,12 +185,12 @@ def test_day_and_time_preferences_filter_correctly():
 
 def test_category_pref_filters_to_selected_categories():
     _facilities, sessions = load_fixture(FIXTURE_PATH)
-    aquatics_only = SearchPreferences(categories=["Aquatics"])
-    eligible = eligible_sessions_for(TODDLER, sessions, aquatics_only, TODAY)
+    swim_only = SearchPreferences(categories=["Swim"])
+    eligible = eligible_sessions_for(TODDLER, sessions, swim_only, TODAY)
     # 1001 "Aquatics - Little Swimmers Level 1" fits; 1003 "Art - ..." should be excluded
     ids = {s.session_id for s in eligible}
     assert "1001" in ids
-    assert all(s.category == "Aquatics" for s in eligible)
+    assert all(s.category == "Swim" for s in eligible)
 
 
 def test_no_category_pref_matches_any_category():
@@ -202,6 +202,6 @@ def test_no_category_pref_matches_any_category():
 def test_category_pref_matches_any_of_multiple_selected():
     _facilities, sessions = load_fixture(FIXTURE_PATH)
     by_id = {s.session_id: s for s in sessions}
-    assert matches_category_pref(by_id["1001"], ["Aquatics", "Fitness"])  # Aquatics
-    assert matches_category_pref(by_id["1005"], ["Aquatics", "Dance"])  # Dance
-    assert not matches_category_pref(by_id["1002"], ["Aquatics", "Dance"])  # Sports
+    assert matches_category_pref(by_id["1001"], ["Swim", "Fitness"])  # Swim
+    assert matches_category_pref(by_id["1005"], ["Swim", "Dance"])  # Dance
+    assert not matches_category_pref(by_id["1002"], ["Swim", "Dance"])  # Sports

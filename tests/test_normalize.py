@@ -8,16 +8,22 @@ def test_category_aliases_fold_into_art():
         "Fiber Arts - Weaving - On Loom: Beginning",
         "Mixed Media - Encaustic Painting",
         "Sewing - Beginner",
+        "Messy Art - Little Picassos",
     ]:
         assert _derive_category(name) == "Art"
 
 
 def test_category_aliases_fold_into_dance():
-    for name in ["Ballet - Basics", "Creative Dance - Preschool"]:
+    for name in [
+        "Ballet - Basics",
+        "Creative Dance - Preschool",
+        "Jazz Dance - First Steps",
+        "PreBallet - Starting Steps!",
+    ]:
         assert _derive_category(name) == "Dance"
 
 
-def test_pool_name_prefixes_fold_into_aquatics():
+def test_pool_name_prefixes_fold_into_swim():
     """Some swim lesson listings use the pool's name instead of a category."""
     for name in [
         "Creston - Goldfish",
@@ -29,7 +35,7 @@ def test_pool_name_prefixes_fold_into_aquatics():
         "MSCC - Pre - Penguin",
         "SWCC - Dolphin",
     ]:
-        assert _derive_category(name) == "Aquatics"
+        assert _derive_category(name) == "Swim"
 
 
 def test_removed_categories_become_uncategorized():

@@ -39,7 +39,7 @@ class Registrant:
 class SearchPreferences:
     day_pref: Optional[str] = None   # "weekday" | "weekend" | None
     time_pref: Optional[str] = None  # "morning" | "afternoon" | "evening" | None
-    categories: Optional[list[str]] = None  # e.g. ["Aquatics", "Art"]; None/empty = any
+    categories: Optional[list[str]] = None  # e.g. ["Swim", "Art"]; None/empty = any
 
 
 def age_in_months(birth_date: date, as_of: date) -> int:

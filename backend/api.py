@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from backend.db import load_facility_coords, load_sessions
 from backend.matching import (
-    Registrant, SearchPreferences, eligible_sessions_for, find_matches, full_sessions_for,
+    Registrant, SearchPreferences, eligible_sessions_for, find_matches, full_sessions_for, is_future,
 )
 
 app = FastAPI(title="Parks & Rec Finder API")
@@ -77,7 +77,7 @@ class SearchRequest(BaseModel):
     registrants: list[RegistrantIn]
     day_pref: Optional[str] = None   # "weekday" | "weekend"
     time_pref: Optional[str] = None  # "morning" | "afternoon" | "evening"
-    categories: Optional[list[str]] = None  # e.g. ["Aquatics", "Art"]; empty/omitted = any
+    categories: Optional[list[str]] = None  # e.g. ["Swim", "Art"]; empty/omitted = any
     only_open_for_enrollment: bool = False  # exclude classes whose "Enroll Now" isn't clickable yet
     address: Optional[str] = None
     address_lat: Optional[float] = None  # pre-resolved coords from autocomplete
@@ -184,7 +184,7 @@ def search(req: SearchRequest):
 
 @app.get("/categories")
 def categories(birth_dates: list[str] = Query(default=[])):
-    """Distinct activity categories available to filter on, e.g. "Aquatics", "Art".
+    """Distinct activity categories available to filter on, e.g. "Swim", "Art".
 
     If birth_dates (ISO "YYYY-MM-DD") are given, only categories with at
     least one open, future, age-eligible session for one of those children
@@ -199,10 +199,18 @@ def categories(birth_dates: list[str] = Query(default=[])):
         except (ValueError, TypeError):
             continue
 
-    if not registrants:
-        return {"categories": sorted({s.category for s in sessions if s.category})}
-
     today = date.today()
+
+    if not registrants:
+        # Restrict to open+future even with no kids registered yet -- otherwise
+        # a category whose only sessions are long past (stale rows the DB
+        # never prunes) would still show up as a selectable chip.
+        return {
+            "categories": sorted({
+                s.category for s in sessions
+                if s.category and s.status == "open" and is_future(s, today)
+            })
+        }
     prefs = SearchPreferences()
     eligible_categories = {
         s.category
