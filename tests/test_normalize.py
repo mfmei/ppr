@@ -7,8 +7,11 @@ def test_category_aliases_fold_into_art():
         "Ceramics - Youth: Wheel Throwing",
         "Fiber Arts - Weaving - On Loom: Beginning",
         "Mixed Media - Encaustic Painting",
-        "Sewing - Beginner",
         "Messy Art - Little Picassos",
+        "Painting - Watercolor: Beginning",
+        "Photography - iPhone",
+        "Printmaking - Block Print",
+        "Drawing - Beginning",
     ]:
         assert _derive_category(name) == "Art"
 
@@ -19,8 +22,23 @@ def test_category_aliases_fold_into_dance():
         "Creative Dance - Preschool",
         "Jazz Dance - First Steps",
         "PreBallet - Starting Steps!",
+        "Tap Dance - It's Never Too Late",
     ]:
         assert _derive_category(name) == "Dance"
+
+
+def test_category_aliases_fold_into_sewing():
+    for name in ["Art- Knitting - Stitching Together", "Crochet - Beginner", "Sewing - Beginner"]:
+        assert _derive_category(name) == "Sewing"
+
+
+def test_category_aliases_fold_into_woodworking():
+    for name in [
+        "Woodturning - Intermediate Studio",
+        "Woodturning for Beginners - Basic Bowl Turning",
+        "Woodworking - Hand Tool Basics",
+    ]:
+        assert _derive_category(name) == "Woodworking"
 
 
 def test_pool_name_prefixes_fold_into_swim():
@@ -64,7 +82,7 @@ def test_unrelated_categories_pass_through_unchanged():
     # Previously removed for being 11+/13+/14+/16+ only, then restored per
     # user request to keep under-10 activities like Pickleball available.
     assert _derive_category("Tennis - Junior Development") == "Tennis"
-    assert _derive_category("Photography - Intro to Film") == "Photography"
+    assert _derive_category("Gymnastics - Tumbling") == "Gymnastics"
     assert _derive_category("Fitness - Yoga Fit") == "Fitness"
     assert _derive_category("Book Arts - Bookbinding") == "Book Arts"
     assert _derive_category("Pickleball - Beginner") == "Pickleball"

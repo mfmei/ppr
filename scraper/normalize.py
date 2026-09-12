@@ -87,12 +87,20 @@ _CATEGORY_ALIASES = {
     "Ceramics": "Art",
     "Fiber Arts": "Art",
     "Mixed Media": "Art",
-    "Sewing": "Art",
     "Messy Art": "Art",
+    "Painting": "Art",
+    "Photography": "Art",
+    "Printmaking": "Art",
+    "Drawing": "Art",
     "Ballet": "Dance",
     "Creative Dance": "Dance",
     "Jazz Dance": "Dance",
     "PreBallet": "Dance",
+    "Tap Dance": "Dance",
+    "Art- Knitting": "Sewing",
+    "Crochet": "Sewing",
+    "Woodturning": "Woodworking",
+    "Woodturning for Beginners": "Woodworking",
     # These activity names use the pool's name (or, for pools housed inside
     # a community center, the center's initials) in place of a category --
     # e.g. "Creston - Goldfish", "EPCC - Sea Lion", "MDCC - Otter" are all
